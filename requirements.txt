@@ -1,0 +1,45 @@
+# Web scraping
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+selenium>=4.15.0
+aiohttp>=3.8.0
+
+# Data processing
+pandas>=2.1.0
+numpy>=1.24.0
+
+# Machine Learning & Embeddings
+scikit-learn>=1.3.0
+sentence-transformers>=2.2.0
+transformers>=4.35.0
+torch>=2.1.0
+
+# Database
+sqlite3
+chromadb>=0.4.0
+
+# API integrations
+biopython>=1.81  # For PubMed
+openai>=1.3.0    # If using OpenAI models
+anthropic>=0.7.0 # If using Claude
+
+# Audio generation
+elevenlabs>=0.2.0  # For TTS
+pydub>=0.25.0
+
+# Configuration
+python-dotenv>=1.0.0
+pydantic>=2.4.0
+PyYAML>=6.0
+
+# Logging and monitoring
+loguru>=0.7.0
+
+# Development
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
+jupyter>=1.0.0
+
+# Rate limiting
+ratelimit>=2.2.0

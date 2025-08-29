@@ -1,0 +1,8 @@
+
+- Objetivo: hacer un flujo automatizado que:
+  - Tome las publicaciones científicas del instituto de fisiología, UNAM, encontradas en (https://www.ifc.unam.mx/publicaciones.php) y que van de los años 2025 (https://www.ifc.unam.mx/publicaciones.php?year=2025) a 2021 (https://www.ifc.unam.mx/publicaciones.php?year=2021).
+    - Necesitamos obtener los abtracts de estos artículos, ya sea de alguna base de datos, o de las ligas del instituto (p. ej., al hacer click en una entrada como https://www.ifc.unam.mx/publicacion.php?ut=000756257200001 , podemos encontrar información básica y el abstract del artículo). 
+  - Crear una base de datos de *Embeds* de los artículos que nos permita reconozer los temas más publicados en el instituto, clusters de conocimiento, etc.
+  - A partir de estos temas que representan mayor interés para el instituto, ahora tenemos que hacer una búsqueda de, por ejemplo, los últimos 1000 artículos publicados en Pubmed en la semana y tomar los 10 articulos que podrían representar un mayor interés para el instituto.
+  - A estos 10 artículos, les vamos a extraer más información (si está disponible) para pasarlos y resumirlos por un LMM del instituto para resumir la información más importante en un formato de "Podcast"
+  - Finalmente, ls guión de formato Posdcast será leído por otro modelo de inteligencia para crear un audio que se pueda publicar y resumirlo en un POdcast.

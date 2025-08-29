@@ -1,0 +1,67 @@
+# Configuration settings for UBMI-IFC-Podcast pipeline
+
+# IFC UNAM settings
+ifc:
+  base_url: "https://www.ifc.unam.mx"
+  publications_endpoint: "/publicaciones.php"
+  publication_detail_endpoint: "/publicacion.php"
+  years_range:
+    start: 2021
+    end: 2025
+  rate_limit_delay: 1.0  # seconds between requests
+
+# PubMed settings
+pubmed:
+  base_url: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
+  email: "your-email@example.com"  # Required by NCBI
+  api_key: null  # Optional, for higher rate limits
+  max_articles_per_week: 1000
+  top_relevant_articles: 10
+  rate_limit_delay: 0.34  # 3 requests per second max
+
+# Embeddings settings
+embeddings:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  vector_db: "chromadb"
+  similarity_threshold: 0.7
+  clustering:
+    method: "kmeans"
+    n_clusters: 10
+
+# LLM settings
+llm:
+  provider: "openai"  # Options: openai, anthropic, local
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 4000
+  podcast_prompt_template: |
+    You are a science communicator creating a podcast script about recent research.
+    Create an engaging 5-minute podcast script summarizing these research articles:
+    
+    {articles}
+    
+    Format: Introduction, main findings, implications, conclusion.
+    Tone: Professional but accessible to a general audience.
+
+# Audio generation settings
+audio:
+  provider: "elevenlabs"  # Options: elevenlabs, azure, local
+  voice_id: "default"
+  output_format: "mp3"
+  quality: "high"
+
+# Database settings
+database:
+  type: "sqlite"
+  path: "data/processed/articles.db"
+  
+# Logging
+logging:
+  level: "INFO"
+  file: "logs/pipeline.log"
+  
+# Output settings
+output:
+  podcast_dir: "outputs/podcasts"
+  script_dir: "outputs/scripts"
+  format: "YYYY-MM-DD_podcast"
