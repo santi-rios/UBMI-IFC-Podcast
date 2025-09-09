@@ -14,8 +14,7 @@ sentence-transformers>=2.2.0
 transformers>=4.35.0
 torch>=2.1.0
 
-# Database
-sqlite3
+# Database (sqlite3 is built into Python)
 chromadb>=0.4.0
 
 # API integrations

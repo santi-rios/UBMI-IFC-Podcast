@@ -13,8 +13,8 @@ ifc:
 # PubMed settings
 pubmed:
   base_url: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
-  email: "your-email@example.com"  # Required by NCBI
-  api_key: null  # Optional, for higher rate limits
+  email: "santiago_gr@ciencias.unam.mx"  # Required by NCBI
+  api_key: 2a8f413442e9366230f338cfa2d1e60d2208  # Optional, for higher rate limits
   max_articles_per_week: 1000
   top_relevant_articles: 10
   rate_limit_delay: 0.34  # 3 requests per second max

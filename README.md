@@ -46,9 +46,16 @@ UBMI-IFC-Podcast/
 git clone <your-repo-url>
 cd UBMI-IFC-Podcast
 
+# RECOMMENDED: Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# OR: venv\Scripts\activate  # Windows
+
 # Install dependencies
 pip install -r requirements.txt
 ```
+
+**📚 For detailed environment setup options, see [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md)**
 
 ### 2. Configuration
 

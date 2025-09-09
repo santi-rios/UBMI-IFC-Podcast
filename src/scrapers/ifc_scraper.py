@@ -12,8 +12,17 @@ from urllib.parse import urljoin, parse_qs, urlparse
 import pandas as pd
 from pathlib import Path
 
-from ..utils.logger import get_logger
-from ..utils.config import load_config
+# Handle both relative and absolute imports for notebook compatibility
+try:
+    from ..utils.logger import get_logger
+    from ..utils.config import load_config
+except ImportError:
+    # Fallback for notebook/standalone usage
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from utils.logger import get_logger
+    from utils.config import load_config
 
 
 @dataclass
@@ -78,42 +87,75 @@ class IFCPublicationScraper:
                 return []
     
     def _parse_publications_page(self, html: str, year: int) -> List[Publication]:
-        """Parse the publications listing page"""
+        """Parse the publications listing page based on actual website structure"""
         soup = BeautifulSoup(html, 'html.parser')
         publications = []
         
-        # This will need to be adjusted based on the actual HTML structure
-        # You'll need to inspect the page to find the correct selectors
-        publication_elements = soup.find_all('div', class_='publication-item')  # Adjust selector
+        # Based on analysis: publications are in <a> tags with classes 'opensans400' and 'd-flexy'
+        publication_links = soup.find_all('a', class_=['opensans400', 'd-flexy'])
         
-        for element in publication_elements:
+        self.logger.info(f"Found {len(publication_links)} potential publication links")
+        
+        for i, link in enumerate(publication_links):
             try:
-                # Extract basic information from listing
-                title_element = element.find('a')  # Adjust selector
-                if title_element:
-                    title = title_element.get_text(strip=True)
-                    detail_url = title_element.get('href')
-                    if detail_url:
-                        detail_url = urljoin(self.base_url, detail_url)
+                # Get the full text of the publication entry
+                pub_text = link.get_text().strip()
                 
-                # Extract other visible information
-                authors = self._extract_text_by_class(element, 'authors')  # Adjust
-                journal = self._extract_text_by_class(element, 'journal')  # Adjust
+                # Skip if this doesn't look like a publication (too short or no DOI pattern)
+                if len(pub_text) < 50 or '10.' not in pub_text:
+                    continue
                 
-                pub = Publication(
+                # Extract publication details using regex patterns
+                import re
+                
+                # Extract DOI
+                doi_match = re.search(r'10\.\d+/[^\s<>"]+', pub_text)
+                doi = doi_match.group() if doi_match else ""
+                
+                # Extract year (typically in parentheses)
+                year_match = re.search(r'\((\d{4})\)', pub_text)
+                pub_year = int(year_match.group(1)) if year_match else year
+                
+                # Extract title (usually after year and before journal)
+                # Pattern: (...year...). Title. Journal
+                title_match = re.search(r'\(\d{4}\)\.\s*([^.]+\.)', pub_text)
+                title = title_match.group(1).strip().rstrip('.') if title_match else pub_text[:100]
+                
+                # Extract authors (before the year)
+                author_match = re.search(r'^([^(]+)\s*\(', pub_text)
+                authors = author_match.group(1).strip() if author_match else ""
+                
+                # Extract journal (try different patterns)
+                if title and title in pub_text:
+                    remaining_text = pub_text.split(title, 1)[1] if title in pub_text else pub_text
+                    journal_match = re.search(r'^\s*\.?\s*([^.]+)', remaining_text)
+                    journal = journal_match.group(1).strip() if journal_match else ""
+                else:
+                    journal = ""
+                
+                # Get the href for more details
+                detail_url = link.get('href')
+                if detail_url and not detail_url.startswith('http'):
+                    detail_url = f"https://www.ifc.unam.mx/{detail_url}"
+                
+                publication = Publication(
                     title=title,
                     authors=authors,
                     journal=journal,
-                    year=year,
-                    ifc_url=detail_url
+                    year=pub_year,
+                    doi=doi,
+                    pubmed_id="",  # Will be filled later if available
+                    ifc_url=detail_url or "",
+                    abstract=""  # Will be filled when scraping details
                 )
-                publications.append(pub)
+                
+                publications.append(publication)
                 
             except Exception as e:
-                self.logger.warning(f"Error parsing publication element: {str(e)}")
+                self.logger.error(f"Error parsing publication {i+1}: {str(e)}")
                 continue
         
-        self.logger.info(f"Found {len(publications)} publications for year {year}")
+        self.logger.info(f"Successfully parsed {len(publications)} publications")
         return publications
     
     async def _get_publication_details(self, session: aiohttp.ClientSession, 

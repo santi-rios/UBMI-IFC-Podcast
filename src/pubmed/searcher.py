@@ -11,8 +11,17 @@ from xml.etree import ElementTree as ET
 from urllib.parse import urlencode
 import pandas as pd
 
-from ..utils.logger import get_logger
-from ..utils.config import load_config
+# Handle both relative and absolute imports for notebook compatibility
+try:
+    from ..utils.logger import get_logger
+    from ..utils.config import load_config
+except ImportError:
+    # Fallback for notebook/standalone usage
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from utils.logger import get_logger
+    from utils.config import load_config
 
 
 @dataclass
@@ -63,8 +72,24 @@ class PubMedSearcher:
             # Broad search for recent biomedical articles
             query = "(humans[MeSH Terms]) AND (english[Language])"
         
-        # Add date filter for recent articles
-        query += f" AND {days_back}[PDat]"
+        # For now, skip date filtering to get basic functionality working
+        # TODO: Fix date filter format
+        # Add date filter for recent articles (simpler format)
+        # Use last N days format which is more reliable
+        # if days_back <= 365:
+        #     # For recent searches, use "last N days" format
+        #     query += f' AND "last {days_back} days"[Publication Date]'
+        # else:
+        #     # For longer periods, use date range
+        #     from datetime import datetime, timedelta
+        #     end_date = datetime.now()
+        #     start_date = end_date - timedelta(days=days_back)
+        #     
+        #     # PubMed date format: YYYY/MM/DD
+        #     start_date_str = start_date.strftime("%Y/%m/%d")
+        #     end_date_str = end_date.strftime("%Y/%m/%d")
+        #     
+        #     query += f' AND ("{start_date_str}"[Publication Date]:"{end_date_str}"[Publication Date])'
         
         self.logger.info(f"Searching PubMed with query: {query}")
         

@@ -33,18 +33,101 @@ def check_python_version():
         return True
 
 
+def check_virtual_environment():
+    """Check if we're in a virtual environment"""
+    in_venv = (hasattr(sys, 'real_prefix') or 
+               (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
+    
+    print(f"\n🐍 Python Environment Check:")
+    if in_venv:
+        print("   ✅ Running in virtual environment")
+        venv_path = sys.prefix
+        print(f"   📁 Environment path: {venv_path}")
+    else:
+        print("   ⚠️  Running in global Python environment")
+        print("   💡 Consider using a virtual environment for better isolation")
+    
+    return in_venv
+
+
+def create_virtual_environment():
+    """Create a virtual environment for the project"""
+    print("\n🔧 Creating virtual environment...")
+    
+    venv_path = Path("venv")
+    
+    if venv_path.exists():
+        print("   ℹ️  Virtual environment already exists")
+        return True
+    
+    try:
+        subprocess.check_call([
+            sys.executable, "-m", "venv", "venv"
+        ])
+        print("   ✅ Virtual environment created: ./venv")
+        
+        # Determine activation script based on OS
+        if os.name == 'nt':  # Windows
+            activate_script = "venv\\Scripts\\activate.bat"
+            pip_path = "venv\\Scripts\\pip"
+        else:  # Unix/Linux/macOS
+            activate_script = "source venv/bin/activate"
+            pip_path = "venv/bin/pip"
+        
+        print(f"\n   📝 To activate the environment, run:")
+        print(f"      {activate_script}")
+        print(f"\n   📝 Then run setup again:")
+        print(f"      python setup.py")
+        
+        return True
+        
+    except subprocess.CalledProcessError as e:
+        print(f"   ❌ Failed to create virtual environment: {e}")
+        return False
+
+
 def install_dependencies():
     """Install required dependencies"""
     print("\n📦 Installing dependencies...")
     
+    # Check if we're in a virtual environment
+    in_venv = check_virtual_environment()
+    
+    if not in_venv:
+        print("\n   ⚠️  WARNING: Installing to global Python environment")
+        response = input("   Continue? (y/N/create-venv): ").lower().strip()
+        
+        if response == 'create-venv':
+            if create_virtual_environment():
+                print("\n   🔄 Please activate the virtual environment and run setup again")
+                return False
+            else:
+                return False
+        elif response != 'y':
+            print("   ⏭️  Skipping dependency installation")
+            return False
+    
     try:
+        # Install dependencies
+        print("   📥 Installing packages...")
         subprocess.check_call([
             sys.executable, "-m", "pip", "install", "-r", "requirements.txt"
         ])
-        print("✅ Dependencies installed successfully")
+        print("   ✅ Dependencies installed successfully")
+        
+        # Show installation location
+        pip_location = subprocess.check_output([
+            sys.executable, "-m", "pip", "show", "requests"
+        ]).decode().split('\n')[1].split(': ')[1]
+        print(f"   📁 Installed to: {pip_location}")
+        
         return True
+        
     except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to install dependencies: {e}")
+        print(f"   ❌ Failed to install dependencies: {e}")
+        print("\n   💡 Try these alternatives:")
+        print("      pip install --user -r requirements.txt")
+        print("      pip install --upgrade pip")
         return False
 
 
