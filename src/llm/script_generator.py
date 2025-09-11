@@ -7,8 +7,14 @@ from typing import List, Dict, Optional
 from abc import ABC, abstractmethod
 import json
 
-from ..utils.logger import get_logger
-from ..utils.config import load_config
+# Robust imports for both package and notebook usage
+try:
+    from ..utils.logger import get_logger
+    from ..utils.config import load_config
+except ImportError:
+    # Fallback for direct execution or notebook usage
+    from utils.logger import get_logger
+    from utils.config import load_config
 
 
 class LLMProvider(ABC):
