@@ -1,6 +1,6 @@
 # 🎙️ Sistema Automatizado de Generación de Podcasts Científicos IFC-UNAM
 
-**Presentado a:** Dr. [Nombre del PI]  
+**Presentado a:** Investigador Principal  
 **Desarrollado por:** Santiago  
 **Fecha:** 11 de Septiembre, 2025  
 **Instituto:** Instituto de Fisiología Celular, UNAM
@@ -199,7 +199,7 @@ Este proyecto representa una **innovación significativa** en divulgación cient
 
 ## 📝 Reconocimientos
 
-- **Dr. [Nombre del PI]**: Conceptos de clustering y análisis avanzado
+- **Investigador Principal**: Conceptos de clustering y análisis avanzado
 - **Instituto de Fisiología Celular**: Infraestructura y apoyo
 - **DGTIC-UNAM**: APIs y recursos técnicos disponibles
 
