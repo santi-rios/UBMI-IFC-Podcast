@@ -30,8 +30,8 @@ embeddings:
 
 # LLM settings
 llm:
-  provider: "openai"  # Options: openai, anthropic, local
-  model: "gpt-4"
+  provider: "anthropic"  # Options: openai, anthropic, local
+  model: "claude-3-sonnet-20240229"
   temperature: 0.7
   max_tokens: 4000
   podcast_prompt_template: |
@@ -65,3 +65,9 @@ output:
   podcast_dir: "outputs/podcasts"
   script_dir: "outputs/scripts"
   format: "YYYY-MM-DD_podcast"
+
+# API Keys (add your actual keys here)
+api_keys:
+  openai: ""  # Add your OpenAI API key here
+  anthropic: ""  # Add your Anthropic API key here
+  elevenlabs: ""  # Add your ElevenLabs API key here
