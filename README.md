@@ -39,6 +39,21 @@ UBMI-IFC-Podcast/
 
 ## Quick Start
 
+### 🔒 **IMPORTANT**: Security Setup First
+
+Before running the project, you need to set up your API keys safely:
+
+```bash
+# 1. Copy configuration templates
+cp config/config.template.yaml config/config.yaml
+cp .env.template .env
+
+# 2. Edit config/config.yaml and .env with your actual API keys
+# See SECURITY.md for detailed instructions
+```
+
+**⚠️ NEVER commit files with real API keys to a public repository!**
+
 ### 1. Installation
 
 ```bash

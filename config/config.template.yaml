@@ -1,4 +1,6 @@
 # Configuration settings for UBMI-IFC-Podcast pipeline
+# THIS IS A TEMPLATE - DO NOT PUT REAL API KEYS HERE
+# Copy this file to config.yaml and add your actual API keys
 
 # IFC UNAM settings
 ifc:
@@ -13,8 +15,8 @@ ifc:
 # PubMed settings
 pubmed:
   base_url: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
-  email: "santiago_gr@ciencias.unam.mx"  # Required by NCBI
-  api_key: 2a8f413442e9366230f338cfa2d1e60d2208  # Optional, for higher rate limits
+  email: "your_email@example.com"  # Required by NCBI - CHANGE THIS
+  api_key: "your_pubmed_api_key_here"  # Optional, for higher rate limits
   max_articles_per_week: 1000
   top_relevant_articles: 10
   rate_limit_delay: 0.34  # 3 requests per second max
@@ -66,8 +68,9 @@ output:
   script_dir: "outputs/scripts"
   format: "YYYY-MM-DD_podcast"
 
-# API Keys (add your actual keys here)
+# API Keys - IMPORTANT: Add your actual keys here
+# Never commit this file with real keys to a public repository!
 api_keys:
-  openai: ""  # Add your OpenAI API key here
-  anthropic: ""  # Add your Anthropic API key here
-  elevenlabs: ""  # Add your ElevenLabs API key here
+  openai: "your_openai_api_key_here"  # Get from https://platform.openai.com/api-keys
+  anthropic: "your_anthropic_api_key_here"  # Get from https://console.anthropic.com/
+  elevenlabs: "your_elevenlabs_api_key_here"  # Get from https://elevenlabs.io/

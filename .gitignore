@@ -59,8 +59,16 @@ venv.bak/
 *.swo
 *~
 
-# Environment variables
+# Environment variables and API Keys
 .env
+.env.local
+.env.*.local
+config/config.yaml
+config/config.local.yaml
+**/api_keys.yaml
+**/secrets.yaml
+**/*secret*
+**/*key*
 
 # Jupyter Notebook
 .ipynb_checkpoints
