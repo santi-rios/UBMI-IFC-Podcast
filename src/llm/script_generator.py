@@ -82,6 +82,54 @@ class AnthropicProvider(LLMProvider):
             raise
 
 
+class GoogleProvider(LLMProvider):
+    """Google Gemini provider"""
+    
+    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
+        self.api_key = api_key
+        self.model = model
+        self.logger = get_logger(__name__)
+        
+        # Try different import styles for better compatibility
+        try:
+            # Try new import style first
+            from google import genai
+            self.client = genai.Client(api_key=self.api_key)
+            self.new_api = True
+        except ImportError:
+            # Fallback to legacy import
+            import google.generativeai as genai
+            genai.configure(api_key=self.api_key)
+            self.genai = genai
+            self.new_api = False
+        
+    async def generate_response(self, prompt: str, **kwargs) -> str:
+        """Generate response using Google Gemini API"""
+        try:
+            if self.new_api:
+                # New Client-based API
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=prompt
+                )
+                return response.text
+            else:
+                # Legacy configure-based API
+                model = self.genai.GenerativeModel(self.model)
+                response = model.generate_content(
+                    prompt,
+                    generation_config=self.genai.types.GenerationConfig(
+                        temperature=kwargs.get('temperature', 0.7),
+                        max_output_tokens=kwargs.get('max_tokens', 4000)
+                    )
+                )
+                return response.text
+            
+        except Exception as e:
+            self.logger.error(f"Google Gemini API error: {str(e)}")
+            raise
+
+
 class PodcastScriptGenerator:
     """Generate podcast scripts from research articles"""
     
@@ -105,6 +153,12 @@ class PodcastScriptGenerator:
             if not api_key:
                 raise ValueError("Anthropic API key not found in configuration")
             return AnthropicProvider(api_key, self.config['llm']['model'])
+            
+        elif provider_name == 'google':
+            api_key = self.config['api_keys']['google']
+            if not api_key:
+                raise ValueError("Google API key not found in configuration")
+            return GoogleProvider(api_key, self.config['llm']['model'])
             
         else:
             raise ValueError(f"Unsupported LLM provider: {provider_name}")

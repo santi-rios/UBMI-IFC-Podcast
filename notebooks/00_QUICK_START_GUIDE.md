@@ -8,7 +8,7 @@ Your project automatically generates science podcasts by:
 4. **Using LLM** to generate podcast scripts
 5. **Converting** text to audio
 
-## 🗺️ Your Notebooks Overview
+## 🗺️ Notebooks Overview
 
 | Notebook | Purpose | Status | Next Action |
 |----------|---------|--------|-------------|

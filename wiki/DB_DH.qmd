@@ -1,0 +1,89 @@
+---
+format: html
+---
+
+## DBSCAN (Density-Based Spatial Clustering of Applications with Noise):
+
+- Finds groups (clusters) in data by looking at density: many nearby points = a cluster, isolated points = noise.
+- Unlike k-means, you don’t have to guess the number of clusters ahead of time.
+
+DBSCAN is a clustering algorithm that groups points that are closely packed together (points with many nearby neighbors), marking points that lie in low-density regions as outliers. It's great for finding clusters of arbitrary shape without needing to specify the number of clusters beforehand.
+
+The project uses DBSCAN to group articles into research domains (e.g., 'cardiovascular', 'molecular') based on their semantic similarity.
+
+How it works:
+
+    Text to Vector (Embedding): First, the text of each article (title, abstract) is converted into a high-dimensional numerical vector (an embedding) using a model like sentence-transformers. This vector captures the semantic meaning of the text. Similar articles will have similar vector representations.
+
+    Dimensionality Reduction: These high-dimensional vectors (e.g., 384 dimensions) are projected down to 2D using algorithms like t-SNE or PCA for visualization. This step is crucial for plotting but is separate from the clustering itself.
+
+    Clustering: DBSCAN is applied to the original high-dimensional embeddings to find dense clusters of similar articles.
+
+## BH (silhouette analysis):
+
+- After clustering, you ask: were the clusters actually meaningful?
+- Silhouette score measures how well each point fits within its cluster vs. outside.
+- High silhouette = strong cluster, low = maybe random grouping.
+
+> Together: DBSCAN groups your articles into themes, and silhouette (or similar methods) confirms the quality of those themes.
+
+
+### BH Step (Statistical Validation of Clusters)
+
+Clustering algorithms like DBSCAN will always output some clusters, but:
+
+    Are those clusters meaningful?
+
+    Or are they just artifacts of how the algorithm was run?
+
+Silhouette Analysis
+
+For each point 
+i
+i:
+
+Compute 
+a(i)
+a(i): average distance to all points in its own cluster (how tightly it fits in its cluster).
+
+Compute 
+b(i)
+b(i): average distance to all points in the nearest neighboring cluster (how far it is from other clusters).
+
+The silhouette score for that point:
+
+s(i)=b(i)−a(i)max⁡(a(i),b(i))
+s(i)=
+max(a(i),b(i))
+b(i)−a(i)
+	​
+
+
+s(i)≈1
+s(i)≈1: well-clustered (close to its own cluster, far from others).
+
+s(i)≈0
+s(i)≈0: on the border between clusters.
+
+s(i)≈−1
+s(i)≈−1: probably misclassified.
+
+Overall silhouette score = mean of all 
+s(i)
+s(i).
+
+> 0.5 = strong, well-separated clusters.
+
+0.2–0.5 = weak, but some structure.
+
+< 0.2 = probably no real clusters.
+
+Other BH-style validation methods
+
+Sometimes people combine silhouette with other tests:
+
+Davies–Bouldin Index: measures average similarity between clusters. Lower = better.
+
+Permutation tests / bootstrap: test if the clustering structure is stronger than what you’d get from random data.
+
+Gap Statistic: compares within-cluster variance vs. simulated null distribution.

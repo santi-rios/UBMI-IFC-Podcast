@@ -1,0 +1,129 @@
+---
+format: html
+---
+
+# Embeddings
+
+Embeddings are numerical vectors (long coordinate lists) that capture the meaning of a document or sentence ([Alsini et al., 2024](https://www.nature.com/articles/s41598-024-81506-8)). Articles with similar content have embeddings that are close together in this space.
+
+At the core: an embedding is a numerical vector (a long list of numbers, like [0.13, -0.07, 0.92, ...]).
+
+Each word, sentence, or document is mapped into this vector space.
+
+Proximity in this space encodes similarity of meaning.
+
+“dog” and “puppy” → vectors close together.
+
+“dog” and “rocket” → vectors far apart.
+
+## Visualization and Cluster Identification
+
+- *t-SNE* (t-distributed stochastic neighbor embedding) ([datacamp, 2024](https://www.datacamp.com/es/tutorial/introduction-t-sne)):
+  - High-dimensional embeddings (say 768 dimensions) are hard to visualize.
+  - t-SNE reduces them to 2D while keeping nearby points close.
+  - This allow us to get a scatterplot where clusters = research domains (e.g., “neurogenesis papers” grouped together, “immunology papers” somewhere else).
+- *Cluster identification*: Once you see the scatterplot, you can spot natural groups of articles that are related.
+
+
+## Code Demo
+
+Taken from: [datacamp, 2024](https://www.datacamp.com/es/tutorial/introduction-t-sne).
+
+
+We'll use Scikit-Learn's make_classification to generate synthetic data with 6 features, 1500 samples, and 3 classes.
+
+Then we'll plot the first three features of the data in 3D using Plotly Express's scatter_3d.
+
+```python
+# Install plotly and scikit-learn (provides sklearn.datasets) in the current kernel
+%pip install --quiet plotly scikit-learn
+
+```
+
+```{python}
+#| fig-cap: 3D plot of the data
+
+import plotly.express as px
+from sklearn.datasets import make_classification
+
+X, y = make_classification(
+    n_features=6,
+    n_classes=3,
+    n_samples=1500,
+    n_informative=2,
+    random_state=5,
+    n_clusters_per_class=1,
+)
+
+
+fig = px.scatter_3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], color=y, opacity=0.8)
+fig.show()
+
+```
+
+
+Ajuste y transformación del PCA
+
+Ahora aplicaremos el algoritmo PCA al conjunto de datos para obtener dos componentes del PCA. El fit_transform aprende y transforma el conjunto de datos al mismo tiempo.  
+
+```{python}
+from sklearn.decomposition import PCA
+
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X)
+```
+
+Visualización t-SNE en Python
+
+Ahora podemos visualizar los resultados al mostrar dos componentes del ACP en un gráfico de dispersión. 
+
+    x: Primer componente
+    y: Segundo compañero
+    color: variable objetivo.
+
+También hemos utilizado la función update_layout para añadir un título y renombrar el eje x y el eje y.
+
+```{python}
+fig = px.scatter(x=X_pca[:, 0], y=X_pca[:, 1], color=y)
+fig.update_layout(
+    title="PCA visualization of Custom Classification dataset",
+    xaxis_title="First Principal Component",
+    yaxis_title="Second Principal Component",
+)
+fig.show()
+```
+
+Ajuste y transformación de t-SNE
+
+Ahora aplicaremos el algoritmo t-SNE al conjunto de datos y compararemos los resultados. 
+
+Tras ajustar y transformar los datos, mostraremos la divergencia de Kullback-Leibler (KL) entre la distribución de probabilidad de alta dimensión y la distribución de probabilidad de baja dimensión. 
+
+Una divergencia KL baja es señal de mejores resultados.
+
+```{python}
+from sklearn.manifold import TSNE
+
+tsne = TSNE(n_components=2, random_state=42)
+X_tsne = tsne.fit_transform(X)
+tsne.kl_divergence_
+```
+
+1.1278419494628906
+
+Visualización t-SNE en Python
+
+De forma similar al PCA, visualizaremos dos componentes t-SNE en un gráfico de dispersión. 
+
+```{python}
+fig = px.scatter(x=X_tsne[:, 0], y=X_tsne[:, 1], color=y)
+fig.update_layout(
+    title="t-SNE visualization of Custom Classification dataset",
+    xaxis_title="First t-SNE",
+    yaxis_title="Second t-SNE",
+)
+fig.show()
+```
+
+
+El resultado es bastante mejor que el PCA. Podemos ver claramente tres grandes grupos. 
