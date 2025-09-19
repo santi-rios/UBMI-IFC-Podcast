@@ -42,15 +42,22 @@ class PubMedArticle:
 class PubMedSearcher:
     """Search and retrieve articles from PubMed"""
     
-    def __init__(self, config: Dict = None, use_pymed: bool = False):
+    def __init__(self, config: Dict = None, use_pymed: bool = None):
         self.config = config or load_config()
         self.logger = get_logger(__name__)
         self.base_url = self.config['pubmed']['base_url']
         self.email = self.config['pubmed']['email']
         self.api_key = self.config['pubmed']['api_key']
         self.rate_limit_delay = self.config['pubmed']['rate_limit_delay']
+        
+        # Use config value if not explicitly set
+        if use_pymed is None:
+            use_pymed = self.config['pubmed'].get('use_enhanced_search', False)
+        
         self.use_pymed = use_pymed
-        if use_pymed:
+        
+        # Optional PyMed import and initialization
+        if self.use_pymed:
             try:
                 from pymed import PubMed
                 self.pymed = PubMed(tool='ubmi-ifc-podcast', email=self.email)
