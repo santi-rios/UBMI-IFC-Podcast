@@ -1,15 +1,16 @@
 """
 PubMed search and article retrieval
 """
-
 import asyncio
 import aiohttp
 import time
+import sys
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from xml.etree import ElementTree as ET
 from urllib.parse import urlencode
 import pandas as pd
+from pathlib import Path
 
 # Handle both relative and absolute imports for notebook compatibility
 try:
@@ -17,7 +18,6 @@ try:
     from ..utils.config import load_config
 except ImportError:
     # Fallback for notebook/standalone usage
-    import sys
     from pathlib import Path
     sys.path.append(str(Path(__file__).parent.parent))
     from utils.logger import get_logger
@@ -47,7 +47,7 @@ class PubMedSearcher:
         self.logger = get_logger(__name__)
         self.base_url = self.config['pubmed']['base_url']
         self.email = self.config['pubmed']['email']
-        self.api_key = self.config['pubmed']['api_key']
+        self.api_key = self.config['pubmed'].get('api_key', '')
         self.rate_limit_delay = self.config['pubmed']['rate_limit_delay']
         
         # Use config value if not explicitly set
@@ -90,38 +90,26 @@ class PubMedSearcher:
         """Enhanced search using PyMed library"""
         # For now, skip date filtering to get basic functionality working
         # TODO: Fix date filter format
-        # Add date filter for recent articles (simpler format)
-        # Use last N days format which is more reliable
-        # if days_back <= 365:
-        #     # For recent searches, use "last N days" format
-        #     query += f' AND "last {days_back} days"[Publication Date]'
-        # else:
-        #     # For longer periods, use date range
-        #     from datetime import datetime, timedelta
-        #     end_date = datetime.now()
-        #     start_date = end_date - timedelta(days=days_back)
-        #     
-        #     # PubMed date format: YYYY/MM/DD
-        #     start_date_str = start_date.strftime("%Y/%m/%d")
-        #     end_date_str = end_date.strftime("%Y/%m/%d")
-        #     
-        #     query += f' AND ("{start_date_str}"[Publication Date]:"{end_date_str}"[Publication Date])'
-        
         query = " OR ".join([f'"{term}"[Abstract]' for term in query_terms]) if query_terms else "(humans[MeSH Terms]) AND (english[Language])"
         
-        self.logger.info(f"Searching PubMed with query: {query}")
+        self.logger.info(f"Searching PubMed with PyMed query: {query}")
         
-        # Use PyMed to perform the search
-        results = self.pymed.query(
-            query,
-            max_results=max_results,
-            sort='relevance',
-            retmode='xml'
-        )
-        
-        pmids = [result.pmid for result in results]
-        self.logger.info(f"Found {len(pmids)} articles")
-        return pmids[:max_results]
+        try:
+            # Use PyMed to perform the search
+            results = self.pymed.query(
+                query,
+                max_results=max_results
+            )
+            
+            pmids = [result.pubmed_id for result in results if result.pubmed_id]
+            self.logger.info(f"Found {len(pmids)} articles with PyMed")
+            return pmids[:max_results]
+            
+        except Exception as e:
+            self.logger.error(f"PyMed search failed: {e}")
+            self.logger.info("Falling back to direct API")
+            self.use_pymed = False
+            return await self._search_with_direct_api(query_terms, days_back, max_results)
     
     async def _search_with_direct_api(self, query_terms, days_back, max_results):
         """Your existing implementation"""
@@ -132,7 +120,7 @@ class PubMedSearcher:
             # Broad search for recent biomedical articles
             query = "(humans[MeSH Terms]) AND (english[Language])"
         
-        self.logger.info(f"Searching PubMed with query: {query}")
+        self.logger.info(f"Searching PubMed with direct API query: {query}")
         
         # Parameters for search
         params = {
@@ -156,7 +144,7 @@ class PubMedSearcher:
                     if response.status == 200:
                         xml_content = await response.text()
                         pmids = self._parse_search_results(xml_content)
-                        self.logger.info(f"Found {len(pmids)} articles")
+                        self.logger.info(f"Found {len(pmids)} articles with direct API")
                         return pmids[:max_results]
                     else:
                         self.logger.error(f"PubMed search failed with status {response.status}")
@@ -169,18 +157,18 @@ class PubMedSearcher:
         """Parse XML search results to extract PMIDs"""
         try:
             root = ET.fromstring(xml_content)
-            pmids = []
-            
-            for id_elem in root.findall('.//Id'):
-                pmid = id_elem.text
-                if pmid:
-                    pmids.append(pmid)
-                    
-            return pmids
+            id_list = root.find('.//IdList')
+            if id_list is not None:
+                pmids = [id_elem.text for id_elem in id_list.findall('Id')]
+                return pmids
+            else:
+                self.logger.warning("No IdList found in search results")
+                return []
         except ET.ParseError as e:
-            self.logger.error(f"Error parsing search results XML: {str(e)}")
+            self.logger.error(f"Error parsing search results XML: {e}")
             return []
     
+    # ... rest of your existing methods remain the same ...
     async def fetch_article_details(self, pmids: List[str]) -> List[PubMedArticle]:
         """
         Fetch detailed information for a list of PMIDs
@@ -197,13 +185,12 @@ class PubMedSearcher:
         batch_size = 200  # PubMed allows up to 200 IDs per request
         
         for i in range(0, len(pmids), batch_size):
-            batch = pmids[i:i + batch_size]
-            batch_articles = await self._fetch_batch_details(batch)
+            batch_pmids = pmids[i:i + batch_size]
+            batch_articles = await self._fetch_batch_details(batch_pmids)
             articles.extend(batch_articles)
             
             # Rate limiting
-            if i + batch_size < len(pmids):
-                await asyncio.sleep(self.rate_limit_delay)
+            await asyncio.sleep(self.rate_limit_delay)
         
         self.logger.info(f"Retrieved details for {len(articles)} articles")
         return articles
@@ -234,7 +221,7 @@ class PubMedSearcher:
                         xml_content = await response.text()
                         return self._parse_article_details(xml_content)
                     else:
-                        self.logger.error(f"Failed to fetch details for batch, status: {response.status}")
+                        self.logger.error(f"Article fetch failed with status {response.status}")
                         return []
             except Exception as e:
                 self.logger.error(f"Error fetching article details: {str(e)}")
@@ -246,18 +233,13 @@ class PubMedSearcher:
         
         try:
             root = ET.fromstring(xml_content)
-            
             for article_elem in root.findall('.//PubmedArticle'):
-                try:
-                    article = self._parse_single_article(article_elem)
-                    if article:
-                        articles.append(article)
-                except Exception as e:
-                    self.logger.warning(f"Error parsing individual article: {str(e)}")
-                    continue
+                article = self._parse_single_article(article_elem)
+                if article:
+                    articles.append(article)
                     
         except ET.ParseError as e:
-            self.logger.error(f"Error parsing article details XML: {str(e)}")
+            self.logger.error(f"Error parsing article details XML: {e}")
         
         return articles
     
@@ -283,12 +265,12 @@ class PubMedSearcher:
         # Extract authors
         authors = []
         for author_elem in article_elem.findall('.//Author'):
-            last_name_elem = author_elem.find('.//LastName')
-            first_name_elem = author_elem.find('.//ForeName')
-            if last_name_elem is not None:
-                author_name = last_name_elem.text
-                if first_name_elem is not None:
-                    author_name = f"{first_name_elem.text} {author_name}"
+            lastname = author_elem.find('LastName')
+            firstname = author_elem.find('ForeName')
+            if lastname is not None:
+                author_name = lastname.text or ""
+                if firstname is not None and firstname.text:
+                    author_name = f"{firstname.text} {author_name}"
                 authors.append(author_name)
         
         # Extract journal
@@ -303,21 +285,18 @@ class PubMedSearcher:
             month_elem = pub_date_elem.find('Month')
             day_elem = pub_date_elem.find('Day')
             
-            parts = []
             if year_elem is not None:
-                parts.append(year_elem.text)
-            if month_elem is not None:
-                parts.append(month_elem.text)
-            if day_elem is not None:
-                parts.append(day_elem.text)
-            pub_date = "-".join(parts)
+                pub_date = year_elem.text or ""
+                if month_elem is not None:
+                    pub_date += f"-{month_elem.text or '01'}"
+                    if day_elem is not None:
+                        pub_date += f"-{day_elem.text or '01'}"
         
         # Extract DOI
         doi = None
-        for article_id_elem in article_elem.findall('.//ArticleId'):
-            id_type = article_id_elem.get('IdType')
-            if id_type == 'doi':
-                doi = article_id_elem.text
+        for id_elem in article_elem.findall('.//ArticleId'):
+            if id_elem.get('IdType') == 'doi':
+                doi = id_elem.text
                 break
         
         # Extract MeSH terms
@@ -339,15 +318,14 @@ class PubMedSearcher:
     
     def save_articles(self, articles: List[PubMedArticle], 
                      output_path: str = None) -> None:
-        """Save articles to file"""
-        if not output_path:
-            from ..utils.config import get_data_dir
-            output_path = get_data_dir() / "raw" / "pubmed_articles.json"
+        """Save articles to JSON file"""
+        if output_path is None:
+            output_path = "pubmed_articles.json"
         
-        # Convert to DataFrame
-        data = []
+        # Convert articles to dictionaries
+        articles_data = []
         for article in articles:
-            data.append({
+            articles_data.append({
                 'pmid': article.pmid,
                 'title': article.title,
                 'abstract': article.abstract,
@@ -360,8 +338,10 @@ class PubMedSearcher:
                 'similarity_score': article.similarity_score
             })
         
-        df = pd.DataFrame(data)
-        df.to_json(output_path, orient='records', indent=2)
+        # Save to JSON
+        with open(output_path, 'w', encoding='utf-8') as f:
+            import json
+            json.dump(articles_data, f, indent=2, ensure_ascii=False, default=str)
         
         self.logger.info(f"Saved {len(articles)} articles to {output_path}")
 
