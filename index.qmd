@@ -1,0 +1,941 @@
+---
+title: "UBMI-IFC Podcast Generator"
+subtitle: "Automated Biomedical Research Podcast Generation System"
+author: "UBMI-IFC Team"
+date: today
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-fold: show
+    code-tools: true
+    embed-resources: true
+execute:
+  warning: false
+  error: false
+---
+
+```bash
+source ~/Projects/UBMI-IFC-Podcast/venv/bin/activate
+```
+
+# 🎧 UBMI-IFC Podcast Generator
+
+An intelligent system that automatically generates biomedical research podcasts by scraping IFC research, searching PubMed for related articles, and creating engaging audio content using AI.
+
+## 🚀 Quick Start
+
+This notebook demonstrates the complete workflow from research discovery to podcast generation.
+
+```{python}
+#| label: setup
+#| code-summary: "Setup and imports"
+
+import sys
+import os
+from pathlib import Path
+import asyncio
+import pandas as pd
+from datetime import datetime, timedelta
+import json
+
+# Add src directory to path
+notebook_dir = Path().resolve()
+src_dir = notebook_dir.parent / "src" if notebook_dir.name == "notebooks" else notebook_dir / "src"
+sys.path.insert(0, str(src_dir))
+
+print(f"📁 Project directory: {notebook_dir.parent if notebook_dir.name == 'notebooks' else notebook_dir}")
+print(f"📁 Source directory: {src_dir}")
+print(f"✅ Source exists: {src_dir.exists()}")
+```
+
+```{python}
+#| label: check-modules
+#| code-summary: "Check what modules and classes are actually available"
+
+import sys
+import os
+from pathlib import Path
+import asyncio
+import pandas as pd
+from datetime import datetime, timedelta
+import json
+
+# Add src directory to path
+notebook_dir = Path().resolve()
+src_dir = notebook_dir.parent / "src" if notebook_dir.name == "notebooks" else notebook_dir / "src"
+sys.path.insert(0, str(src_dir))
+
+print(f"📁 Project directory: {notebook_dir.parent if notebook_dir.name == 'notebooks' else notebook_dir}")
+print(f"📁 Source directory: {src_dir}")
+print(f"✅ Source exists: {src_dir.exists()}")
+
+# Function to check what's actually available in each module
+def check_actual_modules():
+    """Check what classes/functions are actually available in each module"""
+    
+    modules_to_check = [
+        ("scrapers.ifc_scraper", "scrapers/ifc_scraper.py"),
+        ("pubmed.searcher", "pubmed/searcher.py"), 
+        ("llm.script_generator", "llm/script_generator.py"),
+        ("utils.config", "utils/config.py"),
+        ("utils.logger", "utils/logger.py")
+    ]
+    
+    available_modules = {}
+    
+    for module_name, file_path in modules_to_check:
+        module_path = src_dir / file_path
+        
+        if module_path.exists():
+            try:
+                # Read the file to see what's defined
+                with open(module_path, 'r') as f:
+                    content = f.read()
+                
+                # Look for class definitions
+                classes = []
+                functions = []
+                for line in content.split('\n'):
+                    line = line.strip()
+                    if line.startswith('class '):
+                        class_name = line.split()[1].split('(')[0].rstrip(':')
+                        classes.append(class_name)
+                    elif line.startswith('def ') and not line.startswith('def _'):
+                        func_name = line.split()[1].split('(')[0]
+                        functions.append(func_name)
+                
+                available_modules[module_name] = {
+                    'exists': True,
+                    'classes': classes,
+                    'functions': functions,
+                    'path': str(module_path)
+                }
+                print(f"✅ {module_name}: {len(classes)} classes, {len(functions)} functions")
+                if classes:
+                    print(f"   Classes: {', '.join(classes)}")
+                if functions[:5]:  # Show first 5 functions
+                    print(f"   Functions: {', '.join(functions[:5])}{'...' if len(functions) > 5 else ''}")
+                    
+            except Exception as e:
+                available_modules[module_name] = {
+                    'exists': True,
+                    'error': str(e),
+                    'path': str(module_path)
+                }
+                print(f"❌ {module_name}: Error reading file - {e}")
+        else:
+            available_modules[module_name] = {
+                'exists': False,
+                'path': str(module_path)
+            }
+            print(f"❌ {module_name}: File not found at {module_path}")
+    
+    return available_modules
+
+# Check what's actually available
+print("\n🔍 Checking actual module contents...")
+module_info = check_actual_modules()
+```
+
+## 🤖 Step 3: AI Content Generation
+
+Generate podcast content using AI based on the collected research.
+
+### setup
+
+```{python}
+# Load configuration and check Google API setup
+from utils.config import load_config
+from utils.logger import setup_logger, get_logger
+
+setup_logger(level='INFO')
+logger = get_logger('gemini_test')
+config = load_config()
+
+print('LLM provider:', config['llm']['provider'])
+print('LLM model:', config['llm']['model'])
+print('Temperature:', config['llm']['temperature'])
+print('Max tokens:', config['llm']['max_tokens'])
+
+# Diagnostic: Check entire config structure
+print('\n🔍 Config diagnostic:')
+print('api_keys section exists:', 'api_keys' in config)
+if 'api_keys' in config:
+    print('api_keys content:', list(config['api_keys'].keys()))
+    print('google key exists:', 'google' in config['api_keys'])
+    if 'google' in config['api_keys']:
+        google_key = config['api_keys']['google']
+        print('google key value:', repr(google_key))
+        print('google key length:', len(google_key))
+        print('google key is empty string:', google_key == '')
+
+# Check if Google API key is available
+google_api_key = config['api_keys'].get('google', '')
+if google_api_key:
+    print(f'✅ Google API key found: {google_api_key[:8]}...')
+else:
+    print('❌ No Google API key found in config!')
+```
+
+
+### Scrap IFC scraping
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+# Import 
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+# Import 
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+ paths
+
+
+
+orts
+
+c"
+
+ok_dir}")
+")
+sts()}")
+
+
+g
+er, 
+
+
+
+
+```
+
+### abelito
+
+```{python}
+# Test IFC Scraper
+print("🕷️ Testing IFC Scraper...")
+
+try:
+    ifc_scraper = IFCPublicationScraper(config)
+    
+    # Try to get a small sample of articles from recent year
+    print("  Attempting to scrape articles from 2023...")
+    import asyncio
+    
+    # Use asyncio to run the async method
+    try:
+        loop = asyncio.get_running_loop()
+        # If we're in an event loop, use nest_asyncio
+        import nest_asyncio
+        nest_asyncio.apply()
+        articles_obj = await ifc_scraper.scrape_publications_by_year(2023)
+    except RuntimeError:
+        # Not in an event loop, safe to use asyncio.run
+        articles_obj = asyncio.run(ifc_scraper.scrape_publications_by_year(2023))
+    
+    # Convert Publication objects to dictionaries
+    articles = []
+    for pub in articles_obj[:3]:  # Limit to 3 for testing
+        articles.append({
+            'title': pub.title,
+            'abstract': pub.abstract,
+            'authors': pub.authors,
+            'year': pub.year,
+            'source': 'IFC-UNAM'
+        })
+    
+    if articles:
+        print(f"✅ Successfully scraped {len(articles)} articles")
+        print(f"  Sample title: {articles[0].get('title', 'No title')[:100]}...")
+        ifc_working = True
+    else:
+        print("⚠️ No articles returned (might be website issue)")
+        ifc_working = False
+        
+except Exception as e:
+    print(f"❌ IFC Scraper failed: {e}")
+    print("  This is common - we'll use mock data instead")
+    ifc_working = False
+    articles = []
+```
+
+### Fetch
+
+```{python}
+#| label: ai-content
+#| code-summary: "Generate podcast content with AI"
+
+async def generate_podcast_content():
+    """Generate podcast script using AI"""
+    
+    print("🤖 Generating podcast content with AI...")
+    
+    # Prepare content for AI processing
+    content_data = {
+        'ifc_publications': ifc_publications[:3] if ifc_publications else [],
+        'pubmed_articles': pubmed_articles[:5] if pubmed_articles else [],
+        'topic': 'Biomedical Research Highlights',
+        'target_duration': '10-15 minutes'
+    }
+    
+    try:
+        content_generator = ContentGenerator(config)
+        
+        # Generate podcast script
+        podcast_script = await content_generator.generate_podcast_script(content_data)
+        
+        print(f"✅ Generated podcast script ({len(podcast_script)} characters)")
+        print(f"\n📄 Script preview:")
+        print(f"{podcast_script[:400]}...")
+        
+        # Generate episode metadata
+        metadata = await content_generator.generate_episode_metadata(content_data)
+        
+        print(f"\n📋 Episode metadata:")
+        print(f"   Title: {metadata.get('title', 'N/A')}")
+        print(f"   Description: {metadata.get('description', 'N/A')[:100]}...")
+        print(f"   Tags: {metadata.get('tags', [])}")
+        print(f"   Duration estimate: {metadata.get('duration_estimate', 'N/A')}")
+        
+        return {
+            'script': podcast_script,
+            'metadata': metadata,
+            'source_data': content_data
+        }
+        
+    except Exception as e:
+        print(f"❌ AI content generation failed: {e}")
+        # Return mock content for demonstration
+        return {
+            'script': "Welcome to the UBMI-IFC Podcast! Today we'll discuss exciting developments in biomedical research...",
+            'metadata': {
+                'title': 'Biomedical Research Highlights',
+                'description': 'Latest discoveries from IFC investigators and related research',
+                'tags': ['biomedical', 'research', 'IFC'],
+                'duration_estimate': '10 minutes'
+            },
+            'source_data': content_data
+        }
+
+# Generate content
+podcast_content = await generate_podcast_content()
+```
+
+## 🎤 Step 4: Voice Generation
+
+Convert the podcast script to audio using AI voice synthesis.
+
+```{python}
+#| label: voice-generation
+#| code-summary: "Generate podcast audio"
+
+async def generate_podcast_audio():
+    """Generate podcast audio from script"""
+    
+    print("🎤 Generating podcast audio...")
+    
+    try:
+        voice_generator = VoiceGenerator(config)
+        
+        # Generate audio from script
+        audio_file = await voice_generator.text_to_speech(
+            text=podcast_content['script'],
+            voice_settings={
+                'voice': 'professional',
+                'speed': 'normal',
+                'style': 'conversational'
+            }
+        )
+        
+        if audio_file and audio_file.exists():
+            file_size = audio_file.stat().st_size / (1024 * 1024)  # MB
+            print(f"✅ Generated audio file: {audio_file}")
+            print(f"📁 File size: {file_size:.2f} MB")
+            print(f"🎵 Estimated duration: {podcast_content['metadata']['duration_estimate']}")
+            
+            return audio_file
+        else:
+            print("⚠️  Audio generation completed but file not found")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Voice generation failed: {e}")
+        print("💡 This might be due to API configuration or quota limits")
+        return None
+
+# Generate audio (this might fail without proper API keys)
+try:
+    audio_file = await generate_podcast_audio()
+except Exception as e:
+    print(f"⏭️  Skipping audio generation: {e}")
+    audio_file = None
+```
+
+## 📈 Data Analysis & Quality Metrics
+
+Analyze the quality and characteristics of collected data.
+
+```{python}
+#| label: data-analysis
+#| code-summary: "Analyze collected data quality"
+
+def analyze_data_quality():
+    """Analyze the quality of collected research data"""
+    
+    print("📊 Data Quality Analysis")
+    print("=" * 50)
+    
+    # IFC Publications Analysis
+    print(f"\n📚 IFC Publications:")
+    print(f"   Total publications: {len(ifc_publications)}")
+    
+    if ifc_publications:
+        # Analyze publication characteristics
+        with_abstracts = sum(1 for p in ifc_publications if hasattr(p, 'abstract') and p.abstract)
+        with_keywords = sum(1 for p in ifc_publications if hasattr(p, 'keywords') and p.keywords)
+        
+        print(f"   With abstracts: {with_abstracts} ({with_abstracts/len(ifc_publications)*100:.1f}%)")
+        print(f"   With keywords: {with_keywords} ({with_keywords/len(ifc_publications)*100:.1f}%)")
+        
+        # Top keywords
+        all_keywords = []
+        for pub in ifc_publications:
+            if hasattr(pub, 'keywords') and pub.keywords:
+                all_keywords.extend(pub.keywords)
+        
+        if all_keywords:
+            keyword_counts = pd.Series(all_keywords).value_counts()
+            print(f"   Top keywords: {', '.join(keyword_counts.head(5).index.tolist())}")
+    
+    # PubMed Articles Analysis
+    print(f"\n🔬 PubMed Articles:")
+    print(f"   Total articles: {len(pubmed_articles)}")
+    
+    if pubmed_articles:
+        # Create analysis DataFrame
+        df_data = []
+        for article in pubmed_articles:
+            df_data.append({
+                'pmid': article.pmid,
+                'title_length': len(article.title) if article.title else 0,
+                'has_abstract': bool(article.abstract),
+                'abstract_length': len(article.abstract) if article.abstract else 0,
+                'author_count': len(article.authors) if article.authors else 0,
+                'has_doi': bool(article.doi),
+                'mesh_terms': len(article.mesh_terms) if article.mesh_terms else 0,
+                'journal': article.journal
+            })
+        
+        df = pd.DataFrame(df_data)
+        
+        print(f"   With abstracts: {df['has_abstract'].sum()} ({df['has_abstract'].mean()*100:.1f}%)")
+        print(f"   With DOI: {df['has_doi'].sum()} ({df['has_doi'].mean()*100:.1f}%)")
+        print(f"   Avg abstract length: {df['abstract_length'].mean():.0f} chars")
+        print(f"   Avg authors: {df['author_count'].mean():.1f}")
+        print(f"   Avg MeSH terms: {df['mesh_terms'].mean():.1f}")
+        
+        # Top journals
+        if not df['journal'].isna().all():
+            top_journals = df['journal'].value_counts().head(3)
+            print(f"   Top journals: {', '.join(top_journals.index.tolist())}")
+    
+    # Content Generation Analysis
+    print(f"\n🤖 Generated Content:")
+    print(f"   Script length: {len(podcast_content['script'])} characters")
+    print(f"   Estimated words: {len(podcast_content['script'].split())}")
+    print(f"   Episode title: {podcast_content['metadata']['title']}")
+    print(f"   Tags: {', '.join(podcast_content['metadata']['tags'])}")
+    
+    # Overall System Performance
+    print(f"\n🎯 System Performance:")
+    success_rate = sum([
+        1 if ifc_publications else 0,
+        1 if pubmed_articles else 0,
+        1 if podcast_content['script'] else 0,
+        1 if audio_file else 0
+    ]) / 4 * 100
+    
+    print(f"   Overall success rate: {success_rate:.1f}%")
+    print(f"   IFC scraping: {'✅' if ifc_publications else '❌'}")
+    print(f"   PubMed search: {'✅' if pubmed_articles else '❌'}")
+    print(f"   Content generation: {'✅' if podcast_content['script'] else '❌'}")
+    print(f"   Voice synthesis: {'✅' if audio_file else '❌'}")
+
+# Run analysis
+analyze_data_quality()
+```
+
+## 💾 Export Results
+
+Save the generated content and analysis results.
+
+```{python}
+#| label: export-results
+#| code-summary: "Save results and generate outputs"
+
+def save_results():
+    """Save all results to files"""
+    
+    # Create output directory
+    output_dir = Path("../outputs") if notebook_dir.name == "notebooks" else Path("outputs")
+    output_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Save podcast content
+    podcast_file = output_dir / f"podcast_content_{timestamp}.json"
+    with open(podcast_file, 'w', encoding='utf-8') as f:
+        json.dump({
+            'timestamp': datetime.now().isoformat(),
+            'script': podcast_content['script'],
+            'metadata': podcast_content['metadata'],
+            'source_articles': len(pubmed_articles),
+            'source_ifc_pubs': len(ifc_publications)
+        }, f, indent=2, ensure_ascii=False)
+    
+    print(f"💾 Saved podcast content to: {podcast_file}")
+    
+    # Save research data summary
+    summary_file = output_dir / f"research_summary_{timestamp}.json"
+    research_summary = {
+        'timestamp': datetime.now().isoformat(),
+        'ifc_publications': [
+            {
+                'title': pub.title,
+                'authors': pub.authors if hasattr(pub, 'authors') else [],
+                'date': str(pub.date) if hasattr(pub, 'date') else None,
+                'keywords': pub.keywords if hasattr(pub, 'keywords') else []
+            } for pub in ifc_publications
+        ],
+        'pubmed_articles': [
+            {
+                'pmid': article.pmid,
+                'title': article.title,
+                'journal': article.journal,
+                'authors': article.authors,
+                'abstract_preview': article.abstract[:200] + "..." if article.abstract else None
+            } for article in pubmed_articles
+        ]
+    }
+    
+    with open(summary_file, 'w', encoding='utf-8') as f:
+        json.dump(research_summary, f, indent=2, ensure_ascii=False, default=str)
+    
+    print(f"💾 Saved research summary to: {summary_file}")
+    
+    # Create README for outputs
+    readme_content = f"""# UBMI-IFC Podcast Generator - Output
+
+Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+## Files Generated
+
+- `podcast_content_{timestamp}.json`: Complete podcast script and metadata
+- `research_summary_{timestamp}.json`: Source research data summary
+- Audio file: {audio_file.name if audio_file else 'Not generated'}
+
+## Summary
+
+- IFC Publications Found: {len(ifc_publications)}
+- PubMed Articles Found: {len(pubmed_articles)}
+- Podcast Script Length: {len(podcast_content['script'])} characters
+- Estimated Duration: {podcast_content['metadata']['duration_estimate']}
+
+## Next Steps
+
+1. Review generated content
+2. Edit podcast script if needed
+3. Generate final audio file
+4. Publish podcast episode
+"""
+    
+    readme_file = output_dir / f"README_{timestamp}.md"
+    with open(readme_file, 'w', encoding='utf-8') as f:
+        f.write(readme_content)
+    
+    print(f"📄 Created README: {readme_file}")
+    print(f"\n📁 All outputs saved to: {output_dir}")
+
+# Save results
+save_results()
+```
+
+## 🎯 System Status & Next Steps
+
+```{python}
+#| label: final-status
+#| code-summary: "Display final system status"
+
+def display_final_status():
+    """Display comprehensive system status and next steps"""
+    
+    print("🎯 UBMI-IFC Podcast Generator - Final Status")
+    print("=" * 60)
+    
+    # Component status
+    components = [
+        ("🔍 IFC Scraping", len(ifc_publications) > 0),
+        ("📚 PubMed Search", len(pubmed_articles) > 0),
+        ("🤖 Content Generation", bool(podcast_content['script'])),
+        ("🎤 Voice Synthesis", audio_file is not None)
+    ]
+    
+    print("\n📊 Component Status:")
+    for component, status in components:
+        status_icon = "✅" if status else "❌"
+        print(f"   {status_icon} {component}")
+    
+    # Performance metrics
+    total_articles = len(ifc_publications) + len(pubmed_articles)
+    print(f"\n📈 Performance Metrics:")
+    print(f"   Total articles processed: {total_articles}")
+    print(f"   Content generated: {len(podcast_content['script'])} characters")
+    print(f"   Success rate: {sum(status for _, status in components) / len(components) * 100:.1f}%")
+    
+    # Configuration status
+    print(f"\n⚙️ Configuration Status:")
+    config_issues = []
+    if config['pubmed']['email'] == 'your-email@example.com':
+        config_issues.append("PubMed email not configured")
+    if not config.get('ai', {}).get('api_key'):
+        config_issues.append("AI API key missing")
+    if not config.get('voice', {}).get('api_key'):
+        config_issues.append("Voice API key missing")
+    
+    if config_issues:
+        print(f"   ⚠️  Issues: {', '.join(config_issues)}")
+    else:
+        print(f"   ✅ All configurations valid")
+    
+    # Next steps
+    print(f"\n🚀 Next Steps:")
+    if not ifc_publications:
+        print("   1. ⚠️  Configure IFC scraping or add test data")
+    if not pubmed_articles:
+        print("   2. ⚠️  Verify PubMed configuration and network connectivity")
+    if not audio_file:
+        print("   3. ⚠️  Configure voice synthesis API for audio generation")
+    
+    print("   4. ✅ Review generated content in outputs folder")
+    print("   5. ✅ Test with different research topics")
+    print("   6. ✅ Set up automated scheduling for regular podcast generation")
+    
+    # Repository info
+    print(f"\n📁 Repository Structure:")
+    print("   📂 src/ - Core application code")
+    print("   📂 notebooks/ - Testing and demonstration notebooks")
+    print("   📂 config/ - Configuration files")
+    print("   📂 outputs/ - Generated podcasts and data")
+    print("   📄 This notebook - Complete system demonstration")
+
+display_final_status()
+```
+
+---
+
+## 🛠️ Technical Implementation
+
+### Architecture Overview
+
+The UBMI-IFC Podcast Generator consists of four main components:
+
+1. **IFC Scraper**: Monitors and extracts research publications from IFC investigators
+2. **PubMed Searcher**: Finds related articles using advanced search strategies  
+3. **AI Content Generator**: Creates engaging podcast scripts from research data
+4. **Voice Synthesizer**: Converts scripts to natural-sounding audio
+
+### Key Features
+
+- ✅ **Automated Research Discovery**: Continuously monitors IFC research output
+- ✅ **Intelligent Content Matching**: Uses AI to find related PubMed articles
+- ✅ **Natural Language Generation**: Creates engaging, accessible podcast content
+- ✅ **Professional Audio Output**: High-quality voice synthesis
+- ✅ **Configurable Workflows**: Flexible system for different use cases
+
+### Dependencies
+
+```python
+# Core dependencies
+aiohttp>=3.8.0
+pandas>=1.5.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# AI and Voice
+openai>=1.0.0  # or google-generativeai
+elevenlabs>=0.2.0  # or alternative TTS
+
+# Scraping and parsing
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+```
+
+## 📖 Usage Examples
+
+### Quick Start
+```bash
+# 1. Clone repository
+git clone https://github.com/your-org/ubmi-ifc-podcast
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Configure APIs
+cp config/config.example.yaml config/config.yaml
+# Edit config.yaml with your API keys
+
+# 4. Run this notebook or use the CLI
+python -m src.main --topic "neuroscience" --duration 15
+```
+
+### Custom Topics
+```python
+# Generate podcast for specific research area
+from src.main import PodcastGenerator
+
+generator = PodcastGenerator()
+podcast = await generator.create_episode(
+    topic="cardiovascular research",
+    days_back=30,
+    max_articles=10
+)
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+## 📄 License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+- **UBMI-IFC Team** for research data and domain expertise
+- **NCBI PubMed** for comprehensive biomedical literature access
+- **AI Providers** for content generation and voice synthesis capabilities
+
+---
+
+*Generated automatically by the UBMI-IFC Podcast Generator system*
