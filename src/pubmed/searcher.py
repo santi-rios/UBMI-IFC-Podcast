@@ -42,13 +42,22 @@ class PubMedArticle:
 class PubMedSearcher:
     """Search and retrieve articles from PubMed"""
     
-    def __init__(self, config: Dict = None):
+    def __init__(self, config: Dict = None, use_pymed: bool = False):
         self.config = config or load_config()
         self.logger = get_logger(__name__)
         self.base_url = self.config['pubmed']['base_url']
         self.email = self.config['pubmed']['email']
         self.api_key = self.config['pubmed']['api_key']
         self.rate_limit_delay = self.config['pubmed']['rate_limit_delay']
+        self.use_pymed = use_pymed
+        if use_pymed:
+            try:
+                from pymed import PubMed
+                self.pymed = PubMed(tool='ubmi-ifc-podcast', email=self.email)
+                self.logger.info("PyMed backend enabled")
+            except ImportError:
+                self.logger.warning("PyMed not installed, falling back to direct API")
+                self.use_pymed = False
         
     async def search_recent_articles(self, 
                                    query_terms: List[str] = None,
@@ -65,13 +74,13 @@ class PubMedSearcher:
         Returns:
             List of PubMed IDs
         """
-        # Build search query
-        if query_terms:
-            query = " OR ".join([f'"{term}"[Abstract]' for term in query_terms])
+        if self.use_pymed:
+            return await self._search_with_pymed(query_terms, days_back, max_results)
         else:
-            # Broad search for recent biomedical articles
-            query = "(humans[MeSH Terms]) AND (english[Language])"
-        
+            return await self._search_with_direct_api(query_terms, days_back, max_results)
+    
+    async def _search_with_pymed(self, query_terms, days_back, max_results):
+        """Enhanced search using PyMed library"""
         # For now, skip date filtering to get basic functionality working
         # TODO: Fix date filter format
         # Add date filter for recent articles (simpler format)
@@ -90,6 +99,31 @@ class PubMedSearcher:
         #     end_date_str = end_date.strftime("%Y/%m/%d")
         #     
         #     query += f' AND ("{start_date_str}"[Publication Date]:"{end_date_str}"[Publication Date])'
+        
+        query = " OR ".join([f'"{term}"[Abstract]' for term in query_terms]) if query_terms else "(humans[MeSH Terms]) AND (english[Language])"
+        
+        self.logger.info(f"Searching PubMed with query: {query}")
+        
+        # Use PyMed to perform the search
+        results = self.pymed.query(
+            query,
+            max_results=max_results,
+            sort='relevance',
+            retmode='xml'
+        )
+        
+        pmids = [result.pmid for result in results]
+        self.logger.info(f"Found {len(pmids)} articles")
+        return pmids[:max_results]
+    
+    async def _search_with_direct_api(self, query_terms, days_back, max_results):
+        """Your existing implementation"""
+        # Build search query
+        if query_terms:
+            query = " OR ".join([f'"{term}"[Abstract]' for term in query_terms])
+        else:
+            # Broad search for recent biomedical articles
+            query = "(humans[MeSH Terms]) AND (english[Language])"
         
         self.logger.info(f"Searching PubMed with query: {query}")
         
