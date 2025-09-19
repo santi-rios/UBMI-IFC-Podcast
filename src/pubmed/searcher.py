@@ -93,7 +93,7 @@ class PubMedSearcher:
         
         self.logger.info(f"Searching PubMed with query: {query}")
         
-        # Parameters for esearch
+        # Parameters for search
         params = {
             'db': 'pubmed',
             'term': query,
