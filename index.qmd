@@ -3,17 +3,25 @@ title: "UBMI-IFC Podcast Generator"
 subtitle: "An Automated Biomedical Research Podcast Generation System"
 author: "UBMI-IFC Team"
 date: today
+date-modified: today
 format:
   html:
-    theme: cosmo
-    toc: true
-    toc-depth: 3
-    code-fold: show
-    code-tools: true
+    theme: darkly
     embed-resources: true
+toc: true
+toc-depth: 3
 execute:
   warning: false
   error: false
+code-fold: true
+code-copy: true
+code-tools:
+    source: repo
+code-line-numbers: true
+highlight-style: atom-one
+lightbox: true
+footnotes-hover: true
+reference-location: block
 ---
 
 # 🎧 UBMI-IFC Podcast Generator
@@ -30,6 +38,10 @@ This document is an interactive demonstration of an intelligent system that auto
 
 This first step sets up the environment, imports all necessary modules, and loads the configuration. It includes robust checks to ensure that even if a module is missing, the notebook can proceed with a mock implementation.
 
+```bash
+source venv/bin/activate
+```
+
 ```{python}
 #| label: setup-and-imports
 #| code-summary: "Setup environment, check and import all modules"
@@ -42,6 +54,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 import json
 import nest_asyncio
+import aiohttp
+from bs4 import BeautifulSoup
 
 # Apply nest_asyncio to allow running async functions in the notebook
 nest_asyncio.apply()
@@ -55,6 +69,11 @@ sys.path.insert(0, str(src_dir))
 print(f"📁 Project directory: {src_dir.parent}")
 print(f"📁 Source directory: {src_dir}")
 print(f"✅ Source exists: {src_dir.exists()}")
+```
+
+
+```{python}
+#| code-summary: "MODULE CHECKING"
 
 # --- 2. DYNAMIC MODULE CHECKING ---
 def check_actual_modules():
@@ -78,8 +97,13 @@ def check_actual_modules():
     return available
 
 module_info = check_actual_modules()
+```
 
-# --- 3. ROBUST IMPORTS WITH FALLBACKS ---
+
+```{python}
+#| code-summary: "Imports"
+
+# --- 3. IMPORTS WITH FALLBACKS ---
 try:
     if module_info.get('utils.config'):
         from utils.config import load_config
@@ -130,10 +154,16 @@ except ImportError:
         async def generate_podcast_script(self, d): return "Mock script."
         async def generate_episode_metadata(self, d): return {'title': 'Mock', 'tags': []}
 
+```
+
+
+```{python}
+#| code-summary: "VOICE GENERATOR"
+
 # --- 4. NOTEBOOK-ONLY VOICE GENERATOR ---
 # This class is defined here to use notebook-specific context like API clients.
 class VoiceGenerator:
-    """Generates audio using Google TTS, available only in this notebook context."""
+    """Generates audio using Google TTS."""
     def __init__(self, config):
         self.config = config
         self.api_key = config.get('api_keys', {}).get('google_tts') or config.get('api_keys', {}).get('google')
@@ -174,6 +204,11 @@ class VoiceGenerator:
         except Exception as e:
             print(f"❌ Voice generation failed: {e}")
             return None
+```
+
+
+```{python}
+#| code-summary: "INITIALIZE"
 
 # --- 5. INITIALIZE ---
 setup_logger(level="INFO")
@@ -189,575 +224,118 @@ else:
 
 ```
 
+
 ## 📚 Step 2: Data Acquisition
 
 We gather the raw material for our podcast by scraping IFC-UNAM for institutional research and searching PubMed for related, broader context.
 
+(I think we should expect ~123 publicaations for 2024)
+
 ```{python}
 #| label: data-acquisition
-#| code-summary: "Scrape IFC and search PubMed for articles"
+#| code-summary: "Scrape IFC 2024"
 
-async def acquire_data():
-    """Scrape IFC and search PubMed for recent articles."""
-    
-    # --- IFC Scraping ---
-    print("\n🕷️ Scraping IFC-UNAM for recent publications...")
-    ifc_scraper = IFCPublicationScraper(config)
-    current_year = datetime.now().year
-    try:
-        ifc_publications = await ifc_scraper.scrape_publications_by_year(current_year)
-        if not ifc_publications: # If no pubs in current year, try last year
-            ifc_publications = await ifc_scraper.scrape_publications_by_year(current_year - 1)
-        print(f"  ✅ Found {len(ifc_publications)} publications from IFC.")
-    except Exception as e:
-        print(f"  ❌ IFC scraping failed: {e}. Proceeding without IFC data.")
-        ifc_publications = []
-
-    # --- PubMed Search ---
-    print("\n🔬 Searching PubMed for related articles...")
-    pubmed_searcher = PubMedSearcher(config)
-    # Use keywords from IFC pubs or default to a broad search
-    search_terms = list(set(kw for pub in ifc_publications for kw in getattr(pub, 'keywords', [])))
-    if not search_terms:
-        search_terms = ['biomedical research', 'molecular biology', 'neuroscience']
-        print(f"  ⚠️ No keywords from IFC, using default terms: {search_terms}")
-    
-    try:
-        pmids = await pubmed_searcher.search_recent_articles(
-            query_terms=search_terms, days_back=90, max_results=20
-        )
-        print(f"  ✅ Found {len(pmids)} relevant article IDs from PubMed.")
-        pubmed_articles = await pubmed_searcher.fetch_article_details(pmids[:10]) # Fetch details for top 10
-        print(f"  ✅ Fetched details for {len(pubmed_articles)} articles.")
-    except Exception as e:
-        print(f"  ❌ PubMed search failed: {e}. Proceeding without PubMed data.")
-        pubmed_articles = []
-        
-    return ifc_publications, pubmed_articles
-
-# Run data acquisition
-ifc_publications, pubmed_articles = await acquire_data()
-```
-
-## 🤖 Step 3: AI Content Generation
-
-With our source material collected, we now use Google's Gemini model to analyze the articles and generate a structured, engaging podcast script and relevant metadata.
-
-```{python}
-#| label: ai-content-generation
-#| code-summary: "Generate podcast script and metadata with AI"
-
-async def generate_content():
-    """Generate podcast script and metadata using an AI content generator."""
-    print("\n🤖 Generating podcast content with AI...")
-    
-    if not ifc_publications and not pubmed_articles:
-        print("  ❌ Cannot generate content: No articles found.")
-        return {'script': '', 'metadata': {}}
-
-    content_data = {
-        'ifc_publications': [p.__dict__ for p in ifc_publications[:2]],
-        'pubmed_articles': [p.__dict__ for p in pubmed_articles[:3]],
-        'topic': 'Recent Advances in Biomedical Science',
-    }
-    
-    try:
-        content_generator = PodcastScriptGenerator(config)
-        script = await content_generator.generate_podcast_script(content_data)
-        metadata = await content_generator.generate_episode_metadata(content_data)
-        
-        print("  ✅ AI content generation successful.")
-        print(f"  📄 Script preview: '{script[:200]}...'")
-        print(f"  🏷️ Episode Title: {metadata.get('title', 'N/A')}")
-        return {'script': script, 'metadata': metadata}
-        
-    except Exception as e:
-        print(f"  ❌ AI content generation failed: {e}")
-        return {'script': 'Error generating script.', 'metadata': {'title': 'Error'}}
-
-# Generate the content
-podcast_content = await generate_content()
-```
-
-## 🎤 Step 4: AI Voice Synthesis
-
-The generated script is now converted into a natural-sounding audio file. This step uses the notebook-defined `VoiceGenerator` which leverages Google's TTS API.
-
-```{python}
-#| label: voice-synthesis
-#| code-summary: "Convert script to audio using AI voice"
-
-async def synthesize_voice():
-    """Convert the generated script to an audio file."""
-    print("\n🎤 Synthesizing voice...")
-    
-    if not podcast_content or not podcast_content.get('script') or "Error" in podcast_content.get('script'):
-        print("  ❌ Cannot generate audio: Invalid script.")
-        return None
-
-    output_dir = Path("outputs/audio")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    audio_file_path = output_dir / f"podcast_episode_{timestamp}.wav"
-    
-    voice_generator = VoiceGenerator(config)
-    generated_file = await voice_generator.text_to_speech(podcast_content['script'], audio_file_path)
-    return generated_file
-
-# Generate the audio file
-audio_file = await synthesize_voice()
-```
-
-## 📈 Step 5: Analysis and Export
-
-Finally, we analyze the results of our pipeline, display quality metrics, and save all the generated assets—the script, metadata, and audio file—to the `outputs` directory.
-
-```{python}
-#| label: analysis-and-export
-#| code-summary: "Analyze results and save all generated files"
-
-def analyze_and_export():
-    """Analyze pipeline results and save all assets."""
-    print("\n📊 Analyzing results and exporting assets...")
-    
-    # --- Create Output Directory ---
-    output_dir = Path("outputs")
-    output_dir.mkdir(exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    # --- Data Quality Analysis ---
-    print("\n--- Data Quality ---")
-    print(f"  IFC Publications Found: {len(ifc_publications)}")
-    print(f"  PubMed Articles Found: {len(pubmed_articles)}")
-    
-    # --- Content Analysis ---
-    print("\n--- Generated Content ---")
-    script_len = len(podcast_content.get('script', ''))
-    word_count = len(podcast_content.get('script', '').split())
-    print(f"  Script Length: {script_len} characters (~{word_count} words)")
-    print(f"  Episode Title: {podcast_content.get('metadata', {}).get('title', 'N/A')}")
-
-    # --- Export JSON Content ---
-    content_path = output_dir / f"podcast_{timestamp}.json"
-    with open(content_path, 'w', encoding='utf-8') as f:
-        json.dump(podcast_content, f, indent=2, ensure_ascii=False)
-    print(f"\n💾 Script and metadata saved to: {content_path}")
-
-    # --- Final Status ---
-    print("\n--- Pipeline Status ---")
-    status = {
-        "IFC Scraping": len(ifc_publications) > 0,
-        "PubMed Search": len(pubmed_articles) > 0,
-        "AI Script Generation": script_len > 100,
-        "AI Voice Synthesis": audio_file is not None and audio_file.exists()
-    }
-    for component, success in status.items():
-        print(f"  {'✅' if success else '❌'} {component}")
-    
-    success_rate = sum(status.values()) / len(status) * 100
-    print(f"  ----------------------")
-    print(f"  🎯 Overall Success Rate: {success_rate:.0f}%")
-
-# Run the final step
-analyze_and_export()
-```
-
----
-
-## 🛠️ Technical Implementation & Usage
-
-### Architecture
-
-The system is built on a modular architecture:
--   **Scrapers**: Asynchronous clients for fetching data from web sources.
--   **LLM Providers**: A unified interface for interacting with different Large Language Models (e.g., Google Gemini).
--   **Workflow**: The main notebook orchestrates the flow of data between these components.
-
-### Quick Start
-
-1.  **Clone the repository.**
-2.  **Install dependencies**: `pip install -r requirements.txt`
-3.  **Configure APIs**: Copy `config/config.example.yaml` to `config/config.yaml` and add your API keys.
-4.  **Run this file**: Use `quarto render index.qmd` to generate a full HTML report or run the cells interactively in a compatible IDE like VS Code.
-```// filepath: /home/santi/Projects/UBMI-IFC-Podcast/index.qmd
----
-title: "UBMI-IFC Podcast Generator"
-subtitle: "An Automated Biomedical Research Podcast Generation System"
-author: "UBMI-IFC Team"
-date: today
-format:
-  html:
-    theme: cosmo
-    toc: true
-    toc-depth: 3
-    code-fold: show
-    code-tools: true
-    embed-resources: true
-execute:
-  warning: false
-  error: false
----
-
-# 🎧 UBMI-IFC Podcast Generator
-
-This document is an interactive demonstration of an intelligent system that automatically generates biomedical research podcasts. The workflow proceeds in four main stages:
-1.  **Data Acquisition**: Scrapes recent publications from the IFC-UNAM website and finds related articles on PubMed.
-2.  **AI Content Generation**: Uses Google Gemini to create an engaging podcast script from the collected research.
-3.  **AI Voice Synthesis**: Converts the generated script into a high-quality audio file using Google's Text-to-Speech technology.
-4.  **Analysis & Export**: Provides quality metrics and saves all generated assets.
-
----
-
-## ⚙️ Step 1: Setup and Configuration
-
-This first step sets up the environment, imports all necessary modules, and loads the configuration. It includes robust checks to ensure that even if a module is missing, the notebook can proceed with a mock implementation.
-
-```{python}
-#| label: setup-and-imports
-#| code-summary: "Setup environment, check and import all modules"
-
-import sys
-import os
-from pathlib import Path
-import asyncio
+import aiohttp
+from bs4 import BeautifulSoup
+import re
 import pandas as pd
-from datetime import datetime, timedelta
-import json
-import nest_asyncio
 
-# Apply nest_asyncio to allow running async functions in the notebook
-nest_asyncio.apply()
-
-# --- 1. PATH SETUP ---
-notebook_dir = Path().resolve()
-# Handle running from root or /notebooks directory
-src_dir = notebook_dir / "src" if (notebook_dir / "src").exists() else notebook_dir.parent / "src"
-sys.path.insert(0, str(src_dir))
-
-print(f"📁 Project directory: {src_dir.parent}")
-print(f"📁 Source directory: {src_dir}")
-print(f"✅ Source exists: {src_dir.exists()}")
-
-# --- 2. DYNAMIC MODULE CHECKING ---
-def check_actual_modules():
-    """Check what classes/functions are actually available in each module."""
-    modules_to_check = [
-        ("scrapers.ifc_scraper", "scrapers/ifc_scraper.py"),
-        ("pubmed.searcher", "pubmed/searcher.py"),
-        ("llm.script_generator", "llm/script_generator.py"),
-        ("utils.config", "utils/config.py"),
-        ("utils.logger", "utils/logger.py")
-    ]
-    available = {}
-    print("\n🔍 Checking module contents...")
-    for name, path in modules_to_check:
-        if (src_dir / path).exists():
-            print(f"  ✅ Found module: {name}")
-            available[name] = True
-        else:
-            print(f"  ❌ Missing module: {name}")
-            available[name] = False
-    return available
-
-module_info = check_actual_modules()
-
-# --- 3. ROBUST IMPORTS WITH FALLBACKS ---
-try:
-    if module_info.get('utils.config'):
-        from utils.config import load_config
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock `load_config`.")
-    def load_config(): return {'llm': {}, 'api_keys': {}}
-
-try:
-    if module_info.get('utils.logger'):
-        from utils.logger import setup_logger, get_logger
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock logger.")
-    def setup_logger(level="INFO"): pass
-    def get_logger(name): return logging.getLogger(name)
-
-try:
-    if module_info.get('scrapers.ifc_scraper'):
-        from scrapers.ifc_scraper import IFCPublicationScraper
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock `IFCPublicationScraper`.")
-    class IFCPublicationScraper:
-        def __init__(self, c): pass
-        async def scrape_publications_by_year(self, y): return []
-
-try:
-    if module_info.get('pubmed.searcher'):
-        from pubmed.searcher import PubMedSearcher, PubMedArticle
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock `PubMedSearcher`.")
-    class PubMedArticle: pass
-    class PubMedSearcher:
-        def __init__(self, c): pass
-        async def search_recent_articles(self, q, d, m): return []
-        async def fetch_article_details(self, p): return []
-
-try:
-    if module_info.get('llm.script_generator'):
-        from llm.script_generator import PodcastScriptGenerator
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock `PodcastScriptGenerator`.")
-    class PodcastScriptGenerator:
-        def __init__(self, c): pass
-        async def generate_podcast_script(self, d): return "Mock script."
-        async def generate_episode_metadata(self, d): return {'title': 'Mock', 'tags': []}
-
-# --- 4. NOTEBOOK-ONLY VOICE GENERATOR ---
-# This class is defined here to use notebook-specific context like API clients.
-class VoiceGenerator:
-    """Generates audio using Google TTS, available only in this notebook context."""
-    def __init__(self, config):
-        self.config = config
-        self.api_key = config.get('api_keys', {}).get('google_tts') or config.get('api_keys', {}).get('google')
-        self.client = None
-        self.available = False
-        if self.api_key:
-            try:
-                from google import genai
-                self.client = genai.Client(api_key=self.api_key)
-                self.available = True
-                print("✅ VoiceGenerator initialized with Google TTS client.")
-            except Exception as e:
-                print(f"❌ VoiceGenerator failed to initialize: {e}")
-        else:
-            print("⚠️ VoiceGenerator: Missing Google TTS API key.")
-
-    async def text_to_speech(self, text: str, output_path: Path):
-        if not self.available:
-            print("❌ Voice generation skipped: client not available.")
-            return None
-        try:
-            print("🎙️ Generating audio with Google TTS...")
-            response = self.client.models.generate_content(
-                model=self.config.get('audio', {}).get('model', 'gemini-2.5-flash-preview-tts'),
-                contents=f"Read this in a professional podcast host voice: {text}",
-                config={"response_modalities": ['Audio']},
-            )
-            audio_data = response.candidates[0].content.parts[0].inline_data.data
+# 1. IMPROVED SCRAPER
+# This version is more flexible and should extract more publications.
+async def scrape_ifc_publications_revised(year=2024):
+    """
+    Revised scraper with more robust parsing and cleaner output preparation.
+    """
+    url = f"https://www.ifc.unam.mx/publicaciones.php?year={year}"
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            html = await response.text()
+            soup = BeautifulSoup(html, 'html.parser')
             
-            import wave
-            with wave.open(str(output_path), "wb") as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(24000)
-                wf.writeframes(audio_data)
-            print(f"✅ Audio saved to {output_path}")
-            return output_path
-        except Exception as e:
-            print(f"❌ Voice generation failed: {e}")
-            return None
+            print(f"🔍 Scraping IFC publications for {year}...")
+            
+            # This selector is good, it finds all the publication containers.
+            publication_links = soup.find_all('a', class_=['opensans400', 'd-flexy'])
+            print(f"📚 Found {len(publication_links)} potential publication links. Attempting to parse all...")
+            
+            publications = []
+            
+            for link in publication_links:
+                pub_text = link.get_text().strip().replace('\n', ' ')
+                
+                # Default values
+                authors, pub_year, title, journal, doi = None, year, None, None, None
 
-# --- 5. INITIALIZE ---
-setup_logger(level="INFO")
-logger = get_logger("podcast_workflow")
-config = load_config()
-google_api_key = config.get('api_keys', {}).get('google', '')
+                try:
+                    # More robust extraction using combined regex and string splitting
+                    
+                    # Extract Authors and Year: Captures everything before "(YYYY)"
+                    author_year_match = re.search(r'^(.*?)\s*\((\d{4})\)', pub_text)
+                    if author_year_match:
+                        authors = author_year_match.group(1).strip().rstrip('.')
+                        pub_year = int(author_year_match.group(2))
 
-print("\n🎉 Setup complete!")
-if google_api_key:
-    print(f"✅ Google API key found: {google_api_key[:8]}...")
-else:
-    print("❌ Google API key not found in config!")
+                    # Extract DOI: Standard DOI pattern
+                    doi_match = re.search(r'(10\.\d+/[^\s<>"]+)', pub_text)
+                    if doi_match:
+                        doi = doi_match.group(1).strip()
+
+                    # Extract Title and Journal from the text between year and DOI
+                    if author_year_match:
+                        # Get the text after the year "(YYYY). "
+                        remaining_text = pub_text[author_year_match.end(0):].strip()
+                        if remaining_text.startswith('.'):
+                            remaining_text = remaining_text[1:].strip()
+                        
+                        # Remove the DOI part if it exists, to not confuse the parser
+                        if doi:
+                            remaining_text = remaining_text.replace(doi, '')
+
+                        # Split the remainder by periods. Usually: "Title. Journal. Other info."
+                        parts = [part.strip() for part in remaining_text.split('.') if part]
+                        if len(parts) > 0:
+                            title = parts[0]
+                        if len(parts) > 1:
+                            journal = parts[1]
+
+                    # Get the IFC-specific URL
+                    ifc_url = link.get('href')
+                    if ifc_url and not ifc_url.startswith('http'):
+                        ifc_url = f"https://www.ifc.unam.mx/{ifc_url}"
+                    
+                    publications.append({
+                        'title': title,
+                        'authors': authors,
+                        'journal': journal,
+                        'year': pub_year,
+                        'doi': doi,
+                        'ifc_url': ifc_url,
+                    })
+                
+                except Exception as e:
+                    # This will catch any unexpected errors for a specific entry
+                    print(f"Could not parse entry: {pub_text[:60]}... | Error: {e}")
+                    continue
+
+            print(f"🎉 Successfully extracted information for {len(publications)} publications!")
+            return publications
+
+# --- Main execution block ---
+publications_data = await scrape_ifc_publications_revised(2024)
+
+# 2. TIDY TABLE OUTPUT
+# Convert the list of dictionaries into a Pandas DataFrame
+if publications_data:
+    df_publications = pd.DataFrame(publications_data)
+    
+    # Set display options for better viewing within notebooks/Quarto
+    pd.set_option('display.max_rows', 10)
+    pd.set_option('display.max_colwidth', 60)
+
+    # Displaying the DataFrame as the last line in the cell
+    # Quarto will automatically render this as a paginated table.
+    df_publications
+
 
 ```
-
-## 📚 Step 2: Data Acquisition
-
-We gather the raw material for our podcast by scraping IFC-UNAM for institutional research and searching PubMed for related, broader context.
-
-```{python}
-#| label: data-acquisition
-#| code-summary: "Scrape IFC and search PubMed for articles"
-
-async def acquire_data():
-    """Scrape IFC and search PubMed for recent articles."""
-    
-    # --- IFC Scraping ---
-    print("\n🕷️ Scraping IFC-UNAM for recent publications...")
-    ifc_scraper = IFCPublicationScraper(config)
-    current_year = datetime.now().year
-    try:
-        ifc_publications = await ifc_scraper.scrape_publications_by_year(current_year)
-        if not ifc_publications: # If no pubs in current year, try last year
-            ifc_publications = await ifc_scraper.scrape_publications_by_year(current_year - 1)
-        print(f"  ✅ Found {len(ifc_publications)} publications from IFC.")
-    except Exception as e:
-        print(f"  ❌ IFC scraping failed: {e}. Proceeding without IFC data.")
-        ifc_publications = []
-
-    # --- PubMed Search ---
-    print("\n🔬 Searching PubMed for related articles...")
-    pubmed_searcher = PubMedSearcher(config)
-    # Use keywords from IFC pubs or default to a broad search
-    search_terms = list(set(kw for pub in ifc_publications for kw in getattr(pub, 'keywords', [])))
-    if not search_terms:
-        search_terms = ['biomedical research', 'molecular biology', 'neuroscience']
-        print(f"  ⚠️ No keywords from IFC, using default terms: {search_terms}")
-    
-    try:
-        pmids = await pubmed_searcher.search_recent_articles(
-            query_terms=search_terms, days_back=90, max_results=20
-        )
-        print(f"  ✅ Found {len(pmids)} relevant article IDs from PubMed.")
-        pubmed_articles = await pubmed_searcher.fetch_article_details(pmids[:10]) # Fetch details for top 10
-        print(f"  ✅ Fetched details for {len(pubmed_articles)} articles.")
-    except Exception as e:
-        print(f"  ❌ PubMed search failed: {e}. Proceeding without PubMed data.")
-        pubmed_articles = []
-        
-    return ifc_publications, pubmed_articles
-
-# Run data acquisition
-ifc_publications, pubmed_articles = await acquire_data()
-```
-
-## 🤖 Step 3: AI Content Generation
-
-With our source material collected, we now use Google's Gemini model to analyze the articles and generate a structured, engaging podcast script and relevant metadata.
-
-```{python}
-#| label: ai-content-generation
-#| code-summary: "Generate podcast script and metadata with AI"
-
-async def generate_content():
-    """Generate podcast script and metadata using an AI content generator."""
-    print("\n🤖 Generating podcast content with AI...")
-    
-    if not ifc_publications and not pubmed_articles:
-        print("  ❌ Cannot generate content: No articles found.")
-        return {'script': '', 'metadata': {}}
-
-    content_data = {
-        'ifc_publications': [p.__dict__ for p in ifc_publications[:2]],
-        'pubmed_articles': [p.__dict__ for p in pubmed_articles[:3]],
-        'topic': 'Recent Advances in Biomedical Science',
-    }
-    
-    try:
-        content_generator = PodcastScriptGenerator(config)
-        script = await content_generator.generate_podcast_script(content_data)
-        metadata = await content_generator.generate_episode_metadata(content_data)
-        
-        print("  ✅ AI content generation successful.")
-        print(f"  📄 Script preview: '{script[:200]}...'")
-        print(f"  🏷️ Episode Title: {metadata.get('title', 'N/A')}")
-        return {'script': script, 'metadata': metadata}
-        
-    except Exception as e:
-        print(f"  ❌ AI content generation failed: {e}")
-        return {'script': 'Error generating script.', 'metadata': {'title': 'Error'}}
-
-# Generate the content
-podcast_content = await generate_content()
-```
-
-## 🎤 Step 4: AI Voice Synthesis
-
-The generated script is now converted into a natural-sounding audio file. This step uses the notebook-defined `VoiceGenerator` which leverages Google's TTS API.
-
-```{python}
-#| label: voice-synthesis
-#| code-summary: "Convert script to audio using AI voice"
-
-async def synthesize_voice():
-    """Convert the generated script to an audio file."""
-    print("\n🎤 Synthesizing voice...")
-    
-    if not podcast_content or not podcast_content.get('script') or "Error" in podcast_content.get('script'):
-        print("  ❌ Cannot generate audio: Invalid script.")
-        return None
-
-    output_dir = Path("outputs/audio")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    audio_file_path = output_dir / f"podcast_episode_{timestamp}.wav"
-    
-    voice_generator = VoiceGenerator(config)
-    generated_file = await voice_generator.text_to_speech(podcast_content['script'], audio_file_path)
-    return generated_file
-
-# Generate the audio file
-audio_file = await synthesize_voice()
-```
-
-## 📈 Step 5: Analysis and Export
-
-Finally, we analyze the results of our pipeline, display quality metrics, and save all the generated assets—the script, metadata, and audio file—to the `outputs` directory.
-
-```{python}
-#| label: analysis-and-export
-#| code-summary: "Analyze results and save all generated files"
-
-def analyze_and_export():
-    """Analyze pipeline results and save all assets."""
-    print("\n📊 Analyzing results and exporting assets...")
-    
-    # --- Create Output Directory ---
-    output_dir = Path("outputs")
-    output_dir.mkdir(exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    # --- Data Quality Analysis ---
-    print("\n--- Data Quality ---")
-    print(f"  IFC Publications Found: {len(ifc_publications)}")
-    print(f"  PubMed Articles Found: {len(pubmed_articles)}")
-    
-    # --- Content Analysis ---
-    print("\n--- Generated Content ---")
-    script_len = len(podcast_content.get('script', ''))
-    word_count = len(podcast_content.get('script', '').split())
-    print(f"  Script Length: {script_len} characters (~{word_count} words)")
-    print(f"  Episode Title: {podcast_content.get('metadata', {}).get('title', 'N/A')}")
-
-    # --- Export JSON Content ---
-    content_path = output_dir / f"podcast_{timestamp}.json"
-    with open(content_path, 'w', encoding='utf-8') as f:
-        json.dump(podcast_content, f, indent=2, ensure_ascii=False)
-    print(f"\n💾 Script and metadata saved to: {content_path}")
-
-    # --- Final Status ---
-    print("\n--- Pipeline Status ---")
-    status = {
-        "IFC Scraping": len(ifc_publications) > 0,
-        "PubMed Search": len(pubmed_articles) > 0,
-        "AI Script Generation": script_len > 100,
-        "AI Voice Synthesis": audio_file is not None and audio_file.exists()
-    }
-    for component, success in status.items():
-        print(f"  {'✅' if success else '❌'} {component}")
-    
-    success_rate = sum(status.values()) / len(status) * 100
-    print(f"  ----------------------")
-    print(f"  🎯 Overall Success Rate: {success_rate:.0f}%")
-
-# Run the final step
-analyze_and_export()
-```
-
----
-
-## 🛠️ Technical Implementation & Usage
-
-### Architecture
-
-The system is built on a modular architecture:
--   **Scrapers**: Asynchronous clients for fetching data from web sources.
--   **LLM Providers**: A unified interface for interacting with different Large Language Models (e.g., Google Gemini).
--   **Workflow**: The main notebook orchestrates the flow of data between these components.
-
-### Quick Start
-
-1.  **Clone the repository.**
-2.  **Install dependencies**: `pip install -r requirements.txt`
-3.  **Configure APIs**: Copy `config/config.example.yaml` to `config/config.yaml` and add your API keys.
-4.  **Run this file**: Use `quarto render index.qmd` to generate a full HTML report or run the cells interactively in a compatible IDE like VS Code.
