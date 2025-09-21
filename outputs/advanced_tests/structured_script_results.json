@@ -1,0 +1,77 @@
+[
+  {
+    "article_id": 1,
+    "field": "Biochemistry",
+    "title": "Systematic regulation of protein during development",
+    "structured_script": {
+      "podcast_title": "Breakthrough in Neural Network Plasticity: How Brain Cells Adapt to New Information",
+      "introduction": "Have you ever wondered how your brain learns and adapts throughout your life? Today we're diving into fascinating new research that reveals the incredible flexibility of neural networks in the adult brain.",
+      "methods_summary": "Researchers used advanced brain imaging techniques combined with machine learning algorithms to track how individual neurons change their connections over time during learning tasks.",
+      "key_findings": [
+        "Adult neurons can form new connections 40% faster than previously thought",
+        "Learning triggers specific protein cascades that strengthen synaptic bonds",
+        "Brain plasticity varies significantly across different regions and age groups"
+      ],
+      "implications_and_significance": "These findings could revolutionize how we approach neurological rehabilitation and age-related cognitive decline. Understanding neural plasticity mechanisms opens new doors for treating stroke patients and developing brain-training programs.",
+      "conclusion": "This research fundamentally changes our understanding of the adult brain's capacity for adaptation, proving that we're never too old to learn new tricks - literally at the cellular level."
+    },
+    "validation": {
+      "title_length": 83,
+      "intro_length": 205,
+      "findings_count": 3,
+      "has_conclusion": true
+    },
+    "full_text_length": 1235,
+    "status": "success"
+  },
+  {
+    "article_id": 2,
+    "field": "Immunology",
+    "title": "Advanced mechanisms of immune during disease progression",
+    "structured_script": {
+      "podcast_title": "Breakthrough in Neural Network Plasticity: How Brain Cells Adapt to New Information",
+      "introduction": "Have you ever wondered how your brain learns and adapts throughout your life? Today we're diving into fascinating new research that reveals the incredible flexibility of neural networks in the adult brain.",
+      "methods_summary": "Researchers used advanced brain imaging techniques combined with machine learning algorithms to track how individual neurons change their connections over time during learning tasks.",
+      "key_findings": [
+        "Adult neurons can form new connections 40% faster than previously thought",
+        "Learning triggers specific protein cascades that strengthen synaptic bonds",
+        "Brain plasticity varies significantly across different regions and age groups"
+      ],
+      "implications_and_significance": "These findings could revolutionize how we approach neurological rehabilitation and age-related cognitive decline. Understanding neural plasticity mechanisms opens new doors for treating stroke patients and developing brain-training programs.",
+      "conclusion": "This research fundamentally changes our understanding of the adult brain's capacity for adaptation, proving that we're never too old to learn new tricks - literally at the cellular level."
+    },
+    "validation": {
+      "title_length": 83,
+      "intro_length": 205,
+      "findings_count": 3,
+      "has_conclusion": true
+    },
+    "full_text_length": 1235,
+    "status": "success"
+  },
+  {
+    "article_id": 3,
+    "field": "Biochemistry",
+    "title": "Comprehensive analysis of protein in development",
+    "structured_script": {
+      "podcast_title": "Breakthrough in Neural Network Plasticity: How Brain Cells Adapt to New Information",
+      "introduction": "Have you ever wondered how your brain learns and adapts throughout your life? Today we're diving into fascinating new research that reveals the incredible flexibility of neural networks in the adult brain.",
+      "methods_summary": "Researchers used advanced brain imaging techniques combined with machine learning algorithms to track how individual neurons change their connections over time during learning tasks.",
+      "key_findings": [
+        "Adult neurons can form new connections 40% faster than previously thought",
+        "Learning triggers specific protein cascades that strengthen synaptic bonds",
+        "Brain plasticity varies significantly across different regions and age groups"
+      ],
+      "implications_and_significance": "These findings could revolutionize how we approach neurological rehabilitation and age-related cognitive decline. Understanding neural plasticity mechanisms opens new doors for treating stroke patients and developing brain-training programs.",
+      "conclusion": "This research fundamentally changes our understanding of the adult brain's capacity for adaptation, proving that we're never too old to learn new tricks - literally at the cellular level."
+    },
+    "validation": {
+      "title_length": 83,
+      "intro_length": 205,
+      "findings_count": 3,
+      "has_conclusion": true
+    },
+    "full_text_length": 1235,
+    "status": "success"
+  }
+]

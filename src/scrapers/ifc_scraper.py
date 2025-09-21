@@ -266,6 +266,58 @@ class IFCPublicationScraper:
         
         self.logger.info(f"Saved {len(publications)} publications to {output_path}")
 
+    async def scrape_all_available_publications(self):
+        """Scrape publications from all available years (2020-2025)"""
+        print("🚀 Starting comprehensive scraping of IFC publications...")
+
+        scraper = self
+        all_publications = []
+        years_to_scrape = range(2020, 2025)  # Adjust range as needed
+
+        for year in years_to_scrape:
+            print(f"\n📅 Scraping year {year}...")
+            try:
+                publications = await scraper.scrape_publications_by_year(year)
+                if publications:
+                    all_publications.extend(publications)
+                    print(f"   ✅ Found {len(publications)} publications for {year}")
+                else:
+                    print(f"   ⚠️ No publications found for {year}")
+                    
+                # Rate limiting
+                await asyncio.sleep(2)
+                
+            except Exception as e:
+                print(f"   ❌ Error scraping {year}: {e}")
+                continue
+
+        print(f"\n🎉 Total publications collected: {len(all_publications)}")
+        
+        # Save raw data
+        output_dir = Path("../data/raw")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        scraper.save_publications(all_publications, output_dir / "all_ifc_publications.json")
+        
+        # Create summary DataFrame
+        df = pd.DataFrame([{
+            'title': pub.title,
+            'authors': pub.authors,
+            'journal': pub.journal,
+            'year': pub.year,
+            'doi': pub.doi,
+            'abstract': pub.abstract[:200] if pub.abstract else 'No abstract',
+            'has_doi': bool(pub.doi),
+            'has_abstract': bool(pub.abstract)
+        } for pub in all_publications])
+        
+        print("\n📊 Data Summary:")
+        print(f"   Publications by year:")
+        print(df['year'].value_counts().sort_index())
+        print(f"\n   Publications with DOI: {df['has_doi'].sum()}/{len(df)}")
+        print(f"   Publications with abstract: {df['has_abstract'].sum()}/{len(df)}")
+        
+        return all_publications, df
 
 async def main():
     """Test function"""

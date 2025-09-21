@@ -1,3 +1,3 @@
 """
-Embeddings package
+Embedding system for IFC publications
 """

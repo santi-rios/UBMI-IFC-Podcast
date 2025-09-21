@@ -1,0 +1,68 @@
+[
+  {
+    "test_case": 1,
+    "title": "Deep Brain Stimulation Effects on Parkinson Disease Motor Symptoms",
+    "expected": "Neuroscience",
+    "predicted": "Cancer Research",
+    "confidence": 0.42987733437585085,
+    "correct": false,
+    "top_predictions": [
+      [
+        "Cancer Research",
+        0.42987733437585085
+      ],
+      [
+        "Neuroscience",
+        0.3371526789669162
+      ],
+      [
+        "Genetics",
+        0.1155278454843061
+      ]
+    ]
+  },
+  {
+    "test_case": 2,
+    "title": "CRISPR-Cas9 Mediated Gene Editing in Cancer Cell Lines",
+    "expected": "Cancer Research",
+    "predicted": "Cancer Research",
+    "confidence": 0.45094092720459805,
+    "correct": true,
+    "top_predictions": [
+      [
+        "Cancer Research",
+        0.45094092720459805
+      ],
+      [
+        "Neuroscience",
+        0.384648530221863
+      ],
+      [
+        "Genetics",
+        0.06820908992125749
+      ]
+    ]
+  },
+  {
+    "test_case": 3,
+    "title": "Novel Vaccine Adjuvants Enhance Antibody Response",
+    "expected": "Immunology",
+    "predicted": "Cancer Research",
+    "confidence": 0.42767708088286976,
+    "correct": false,
+    "top_predictions": [
+      [
+        "Cancer Research",
+        0.42767708088286976
+      ],
+      [
+        "Neuroscience",
+        0.389748352759016
+      ],
+      [
+        "Genetics",
+        0.07879377538052458
+      ]
+    ]
+  }
+]

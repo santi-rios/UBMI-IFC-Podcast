@@ -1,0 +1,23 @@
+chromadb:
+  # Storage settings
+  persist_directory: "data/chromadb"
+  collection_name: "ifc_publications"
+  
+  # Embedding settings
+  embedding_model: "all-MiniLM-L6-v2"  # Good balance of speed and quality
+  embedding_dimension: 384  # Dimension of all-MiniLM-L6-v2
+  
+  # Collection settings
+  distance_metric: "cosine"  # cosine, l2, or ip (inner product)
+  
+  # Batch processing
+  batch_size: 100
+  max_retries: 3
+  
+  # UMAP settings for visualization
+  umap:
+    n_components: 2
+    n_neighbors: 15
+    min_dist: 0.1
+    metric: "cosine"
+    random_state: 42

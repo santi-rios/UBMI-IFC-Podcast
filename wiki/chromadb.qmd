@@ -1,0 +1,294 @@
+---
+format: html
+---
+
+This document touches on modern **vector databases**, **embeddings**, and how to make scientific papers “searchable by meaning” rather than just keywords. Workflow:
+
+1. **Extracts text from scientific articles** (say PDFs).
+2. **Splits the text** into manageable chunks (since embeddings work better on smaller pieces).
+3. **Generates embeddings** (numerical vector representations of text).
+4. **Stores them in ChromaDB** (a vector database).
+5. Allows you to later **query the database semantically**.
+
+---
+
+## Full Workflow Example
+
+```python
+# 1. Install dependencies (if not already installed)
+# pip install pypdf chromadb openai tiktoken
+
+# Add these imports at the top with your existing imports
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import umap
+from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import cosine_similarity
+
+```
+
+
+# ------------------------
+# STEP 1: Load the document
+# ------------------------
+
+```python
+def extract_text_from_pdf(pdf_path):
+    """Extracts all text from a PDF file."""
+    reader = PdfReader(pdf_path)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() + "\n"
+    return text
+
+pdf_path = "../papers/2025-glanville.pdf"
+raw_text = extract_text_from_pdf(pdf_path)
+```
+
+# ------------------------
+# STEP 2: Split into chunks
+# ------------------------
+
+```python
+def split_text(text, chunk_size=500, overlap=50):
+    """
+    Splits text into overlapping chunks of ~chunk_size words.
+    Overlap helps preserve context across chunks.
+    """
+    words = text.split()
+    chunks = []
+    start = 0
+    while start < len(words):
+        end = min(start + chunk_size, len(words))
+        chunk = " ".join(words[start:end])
+        chunks.append(chunk)
+        start += chunk_size - overlap
+    return chunks
+
+chunks = split_text(raw_text)
+```
+
+# ------------------------
+# STEP 3: Generate embeddings
+# ------------------------
+
+# Load config with API keys
+
+```python
+with open("../config/config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+
+# Initialize Gemini client
+genai.configure(api_key=config["api_keys"]["google"])
+
+def get_embeddings(texts, model="text-embedding-004"):
+    """
+    Converts a list of texts into embeddings using Gemini API.
+    Returns list of embedding vectors.
+    """
+    embeddings = []
+    for text in texts:
+        result = genai.embed_content(
+            model=f"models/{model}",
+            content=text
+        )
+        embeddings.append(result['embedding'])
+    return embeddings
+
+embeddings = get_embeddings(chunks)
+```
+
+```{python}
+# Convert embeddings to numpy array for easier manipulation
+embeddings_array = np.array(embeddings)
+print(f"Embeddings shape: {embeddings_array.shape}")
+
+# 1. PCA Visualization (2D)
+def plot_embeddings_pca(embeddings_array, chunks, title="Embeddings PCA Visualization"):
+    """Reduce embeddings to 2D using PCA and plot them."""
+    pca = PCA(n_components=2)
+    embeddings_2d = pca.fit_transform(embeddings_array)
+    
+    plt.figure(figsize=(12, 8))
+    scatter = plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], 
+                         alpha=0.6, c=range(len(embeddings_2d)), cmap='viridis')
+    plt.colorbar(scatter, label='Chunk Index')
+    plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.2%} variance)')
+    plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.2%} variance)')
+    plt.title(title)
+    
+    # Add annotations for a few points
+    for i in range(min(5, len(chunks))):
+        plt.annotate(f'Chunk {i}', (embeddings_2d[i, 0], embeddings_2d[i, 1]),
+                    xytext=(5, 5), textcoords='offset points', fontsize=8)
+    
+    plt.tight_layout()
+    plt.show()
+
+plot_embeddings_pca(embeddings_array, chunks)
+
+# 2. t-SNE Visualization (better for non-linear patterns)
+def plot_embeddings_tsne(embeddings_array, chunks, title="Embeddings t-SNE Visualization"):
+    """Reduce embeddings to 2D using t-SNE and plot them."""
+    tsne = TSNE(n_components=2, random_state=42, perplexity=min(30, len(embeddings_array)-1))
+    embeddings_2d = tsne.fit_transform(embeddings_array)
+    
+    plt.figure(figsize=(12, 8))
+    scatter = plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], 
+                         alpha=0.6, c=range(len(embeddings_2d)), cmap='plasma')
+    plt.colorbar(scatter, label='Chunk Index')
+    plt.xlabel('t-SNE 1')
+    plt.ylabel('t-SNE 2')
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+
+# Only run t-SNE if we have enough chunks (t-SNE needs at least 4 samples)
+if len(embeddings_array) >= 4:
+    plot_embeddings_tsne(embeddings_array, chunks)
+
+# 3. Cosine Similarity Heatmap
+def plot_similarity_heatmap(embeddings_array, max_chunks=20):
+    """Plot cosine similarity heatmap between chunks."""
+    # Limit to first N chunks for readability
+    n_chunks = min(max_chunks, len(embeddings_array))
+    subset_embeddings = embeddings_array[:n_chunks]
+    
+    # Calculate cosine similarity matrix
+    similarity_matrix = cosine_similarity(subset_embeddings)
+    
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(similarity_matrix, 
+                xticklabels=[f'Chunk {i}' for i in range(n_chunks)],
+                yticklabels=[f'Chunk {i}' for i in range(n_chunks)],
+                cmap='coolwarm', center=0, annot=True, fmt='.2f')
+    plt.title('Cosine Similarity Between Text Chunks')
+    plt.tight_layout()
+    plt.show()
+
+plot_similarity_heatmap(embeddings_array)
+
+# 4. Clustering Visualization
+def plot_embeddings_with_clusters(embeddings_array, chunks, n_clusters=5):
+    """Apply K-means clustering and visualize with PCA."""
+    # Apply K-means clustering
+    n_clusters = min(n_clusters, len(embeddings_array))
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(embeddings_array)
+    
+    # Reduce to 2D with PCA
+    pca = PCA(n_components=2)
+    embeddings_2d = pca.fit_transform(embeddings_array)
+    
+    plt.figure(figsize=(12, 8))
+    scatter = plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], 
+                         c=cluster_labels, cmap='tab10', alpha=0.7, s=50)
+    plt.colorbar(scatter, label='Cluster')
+    plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.2%} variance)')
+    plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.2%} variance)')
+    plt.title(f'Text Chunks Clustered into {n_clusters} Groups')
+    
+    # Add cluster centroids
+    centroids_2d = pca.transform(kmeans.cluster_centers_)
+    plt.scatter(centroids_2d[:, 0], centroids_2d[:, 1], 
+               c='red', marker='x', s=200, linewidths=3, label='Centroids')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    
+    # Print cluster information
+    print("\nCluster Analysis:")
+    for i in range(n_clusters):
+        cluster_chunks
+```
+
+# ------------------------
+# STEP 4: Store in ChromaDB
+# ------------------------
+
+```{python}
+# Connect to a local ChromaDB
+chroma_client = chromadb.Client(Settings(
+    persist_directory="./chroma_storage"  # will store DB on disk
+))
+```
+
+```{python}
+# Create (or get) a collection
+collection = chroma_client.get_or_create_collection("test_scientific_articles")
+```
+
+```{python}
+# Insert chunks + embeddings into Chroma
+ids = [f"chunk_{i}" for i in range(len(chunks))]
+
+collection.add(
+    documents=chunks,
+    embeddings=embeddings,
+    ids=ids,
+    metadatas=[{"source": pdf_path}] * len(chunks)
+)
+
+print(f"Inserted {len(chunks)} chunks from {pdf_path} into ChromaDB.")
+```
+
+# ------------------------
+# STEP 5: Query the database
+# ------------------------
+
+```{python}
+query = "What are the effects of hippocampal neurogenesis on memory?"
+query_embedding = get_embeddings([query])[0]
+
+results = collection.query(
+    query_embeddings=[query_embedding],
+    n_results=3
+)
+
+print("Top matches:")
+for doc, metadata in zip(results["documents"][0], results["metadatas"][0]):
+    print(f"Source: {metadata['source']}")
+    print(f"Content: {doc[:200]}...")
+    print("------")
+```
+
+---
+
+## 🔍 What’s Happening Here
+
+1. **Extracting text (`PdfReader`)**
+   PDFs aren’t plain text — we parse each page and concatenate it into a string.
+
+2. **Splitting text into chunks**
+   Embedding models usually have token limits (e.g., 8k tokens max). Long articles are split into overlapping “chunks” (\~500 words). Overlap ensures continuity so concepts aren’t cut off abruptly.
+
+3. **Embedding text (`get_embeddings`)**
+   Each chunk is turned into a **vector of floats** (an embedding). Vectors capture *semantic meaning*, so two texts with similar ideas will have embeddings close together in high-dimensional space.
+
+4. **Storing in ChromaDB**
+   Chroma is a **vector database**. Each record has:
+
+   * `id` (unique ID for the chunk)
+   * `document` (the raw text)
+   * `embedding` (the vector)
+   * `metadata` (like file name, section, author)
+
+   These embeddings are stored persistently on disk (`persist_directory`).
+
+5. **Semantic search**
+   When you query, your query is also embedded → then ChromaDB finds nearest neighbors (chunks with smallest cosine distance in vector space). This allows **meaning-based search**.
+
+---
+
+✅ With this setup, you can:
+
+* Add *all PDFs* from your institute.
+* Search across them with natural language questions.
+* Build on top of it (Q\&A bot, recommendation engine, topic clustering).
+
+---
+
+Do you want me to also show you how to **batch process an entire folder of PDFs** (so you can point it at your institute’s papers and index them all at once)?
