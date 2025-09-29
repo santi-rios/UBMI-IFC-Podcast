@@ -24,318 +24,476 @@ footnotes-hover: true
 reference-location: block
 ---
 
-# 🎧 UBMI-IFC Podcast Generator
 
-This document is an interactive demonstration of an intelligent system that automatically generates biomedical research podcasts. The workflow proceeds in four main stages:
-1.  **Data Acquisition**: Scrapes recent publications from the IFC-UNAM website and finds related articles on PubMed.
-2.  **AI Content Generation**: Uses Google Gemini to create an engaging podcast script from the collected research.
-3.  **AI Voice Synthesis**: Converts the generated script into a high-quality audio file using Google's Text-to-Speech technology.
-4.  **Analysis & Export**: Provides quality metrics and saves all generated assets.
+## Scraper
 
----
+- Obtener todas las publicaciones (2021-2025) de la [página del IFC](https://www.ifc.unam.mx/publicaciones.php?year=2025).
 
-## ⚙️ Step 1: Setup and Configuration
-
-This first step sets up the environment, imports all necessary modules, and loads the configuration. It includes robust checks to ensure that even if a module is missing, the notebook can proceed with a mock implementation.
-
-```bash
-source venv/bin/activate
-```
 
 ```{python}
-#| label: setup-and-imports
-#| code-summary: "Setup environment, check and import all modules"
-
-import sys
-import os
-from pathlib import Path
-import asyncio
-import pandas as pd
-from datetime import datetime, timedelta
 import json
-import nest_asyncio
-import aiohttp
-from bs4 import BeautifulSoup
-
-# Apply nest_asyncio to allow running async functions in the notebook
-nest_asyncio.apply()
-
-# --- 1. PATH SETUP ---
-notebook_dir = Path().resolve()
-# Handle running from root or /notebooks directory
-src_dir = notebook_dir / "src" if (notebook_dir / "src").exists() else notebook_dir.parent / "src"
-sys.path.insert(0, str(src_dir))
-
-print(f"📁 Project directory: {src_dir.parent}")
-print(f"📁 Source directory: {src_dir}")
-print(f"✅ Source exists: {src_dir.exists()}")
-```
-
-
-```{python}
-#| code-summary: "MODULE CHECKING"
-
-# --- 2. DYNAMIC MODULE CHECKING ---
-def check_actual_modules():
-    """Check what classes/functions are actually available in each module."""
-    modules_to_check = [
-        ("scrapers.ifc_scraper", "scrapers/ifc_scraper.py"),
-        ("pubmed.searcher", "pubmed/searcher.py"),
-        ("llm.script_generator", "llm/script_generator.py"),
-        ("utils.config", "utils/config.py"),
-        ("utils.logger", "utils/logger.py")
-    ]
-    available = {}
-    print("\n🔍 Checking module contents...")
-    for name, path in modules_to_check:
-        if (src_dir / path).exists():
-            print(f"  ✅ Found module: {name}")
-            available[name] = True
-        else:
-            print(f"  ❌ Missing module: {name}")
-            available[name] = False
-    return available
-
-module_info = check_actual_modules()
-```
-
-
-```{python}
-#| code-summary: "Imports"
-
-# --- 3. IMPORTS WITH FALLBACKS ---
-try:
-    if module_info.get('utils.config'):
-        from utils.config import load_config
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock `load_config`.")
-    def load_config(): return {'llm': {}, 'api_keys': {}}
-
-try:
-    if module_info.get('utils.logger'):
-        from utils.logger import setup_logger, get_logger
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock logger.")
-    def setup_logger(level="INFO"): pass
-    def get_logger(name): return logging.getLogger(name)
-
-try:
-    if module_info.get('scrapers.ifc_scraper'):
-        from scrapers.ifc_scraper import IFCPublicationScraper
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock `IFCPublicationScraper`.")
-    class IFCPublicationScraper:
-        def __init__(self, c): pass
-        async def scrape_publications_by_year(self, y): return []
-
-try:
-    if module_info.get('pubmed.searcher'):
-        from pubmed.searcher import PubMedSearcher, PubMedArticle
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock `PubMedSearcher`.")
-    class PubMedArticle: pass
-    class PubMedSearcher:
-        def __init__(self, c): pass
-        async def search_recent_articles(self, q, d, m): return []
-        async def fetch_article_details(self, p): return []
-
-try:
-    if module_info.get('llm.script_generator'):
-        from llm.script_generator import PodcastScriptGenerator
-    else: raise ImportError()
-except ImportError:
-    print("⚠️ Using mock `PodcastScriptGenerator`.")
-    class PodcastScriptGenerator:
-        def __init__(self, c): pass
-        async def generate_podcast_script(self, d): return "Mock script."
-        async def generate_episode_metadata(self, d): return {'title': 'Mock', 'tags': []}
-
-```
-
-
-```{python}
-#| code-summary: "VOICE GENERATOR"
-
-# --- 4. NOTEBOOK-ONLY VOICE GENERATOR ---
-# This class is defined here to use notebook-specific context like API clients.
-class VoiceGenerator:
-    """Generates audio using Google TTS."""
-    def __init__(self, config):
-        self.config = config
-        self.api_key = config.get('api_keys', {}).get('google_tts') or config.get('api_keys', {}).get('google')
-        self.client = None
-        self.available = False
-        if self.api_key:
-            try:
-                from google import genai
-                self.client = genai.Client(api_key=self.api_key)
-                self.available = True
-                print("✅ VoiceGenerator initialized with Google TTS client.")
-            except Exception as e:
-                print(f"❌ VoiceGenerator failed to initialize: {e}")
-        else:
-            print("⚠️ VoiceGenerator: Missing Google TTS API key.")
-
-    async def text_to_speech(self, text: str, output_path: Path):
-        if not self.available:
-            print("❌ Voice generation skipped: client not available.")
-            return None
-        try:
-            print("🎙️ Generating audio with Google TTS...")
-            response = self.client.models.generate_content(
-                model=self.config.get('audio', {}).get('model', 'gemini-2.5-flash-preview-tts'),
-                contents=f"Read this in a professional podcast host voice: {text}",
-                config={"response_modalities": ['Audio']},
-            )
-            audio_data = response.candidates[0].content.parts[0].inline_data.data
-            
-            import wave
-            with wave.open(str(output_path), "wb") as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(24000)
-                wf.writeframes(audio_data)
-            print(f"✅ Audio saved to {output_path}")
-            return output_path
-        except Exception as e:
-            print(f"❌ Voice generation failed: {e}")
-            return None
-```
-
-
-```{python}
-#| code-summary: "INITIALIZE"
-
-# --- 5. INITIALIZE ---
-setup_logger(level="INFO")
-logger = get_logger("podcast_workflow")
-config = load_config()
-google_api_key = config.get('api_keys', {}).get('google', '')
-
-print("\n🎉 Setup complete!")
-if google_api_key:
-    print(f"✅ Google API key found: {google_api_key[:8]}...")
-else:
-    print("❌ Google API key not found in config!")
-
-```
-
-
-## 📚 Step 2: Data Acquisition
-
-We gather the raw material for our podcast by scraping IFC-UNAM for institutional research and searching PubMed for related, broader context.
-
-(I think we should expect ~123 publicaations for 2024)
-
-```{python}
-#| label: data-acquisition
-#| code-summary: "Scrape IFC 2024"
-
-import aiohttp
-from bs4 import BeautifulSoup
-import re
 import pandas as pd
+import itables
+from IPython.display import HTML, display
 
-# 1. IMPROVED SCRAPER
-# This version is more flexible and should extract more publications.
-async def scrape_ifc_publications_revised(year=2024):
+# Enable interactive mode for all DataFrames in the notebook
+itables.init_notebook_mode(all_interactive=True)
+
+# Silence itables typing warnings about undocumented 'options' argument
+itables.options.warn_on_undocumented_option = False
+
+# Cargar JSON
+try:
+    with open('./data/raw/all_ifc_publications.json', 'r', encoding='utf-8') as file:
+        publications_scraper = json.load(file)
+    print(f"Resultado de scraper: {len(publications_scraper)} publicaciones")
+except FileNotFoundError:
+    print("Error: './data/raw/all_ifc_publications.json' no existe.")
+    publications_scraper = []
+except json.JSONDecodeError:
+    print("Error: formato inválido de JSON.")
+    publications_scraper = []
+
+# Si hay datos, convertir a DataFrame y mostrar con itables (si está disponible)
+if publications_scraper:
+    # Normalizar estructuras JSON anidadas a columnas planas
+    df = pd.json_normalize(publications_scraper)
+
+    # Mostrar en orden aleatorio
+    df = df.sample(frac=1).reset_index(drop=True)
+
+    # Inject CSS to truncate long text with ellipsis in the rendered DataTable
+    css = """
+    <style>
+    /* Target DataTables cells rendered by itables */
+    table.dataTable td, table.dataTable th {
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* Allow horizontal scrolling for very wide tables */
+    div.dataTables_wrapper {
+      overflow-x: auto;
+    }
+    </style>
     """
-    Revised scraper with more robust parsing and cleaner output preparation.
+    display(HTML(css))
+
+    # DataTables options: fix column widths and enable horizontal scroll
+    dt_options = {
+        'autoWidth': False,
+        'columnDefs': [{'targets': '_all', 'width': '180px'}],
+        'scrollX': True,
+        'pageLength': 25
+    }
+
+    itables.show(df, classes='stripe hover order-column', options=dt_options)
+
+```
+
+## Expandir base de datos
+
+Queremos expandir la base de datos buscando en PUBMED las publicaciones relacioneadas a la afiliación "IFC, UNAM". PAra obtener los nombres de las variaciones del instituto, vamos a ver cómo se escribe en los artíóculos para mejorar la busqueda.
+
+### Obtener PDFs
+
+Para esto, podemos usar una de las 3 variaciones reportadas en 'notebooks/02_expand_database.ipynb'. Se utilizó la opción B (exportar las publicaciones a bib y de ahí importar a zotero y utilizar una extensión que descargue los PDFs).
+
+```{python}
+# Let's also check the actual BibTeX content
+publicaciones_bibtex = './data/processed/all_ifc_publications.bib'
+
+print("\n📄 Ejemplo de artículos en BibTeX:")
+with open(publicaciones_bibtex, 'r', encoding='utf-8') as f:
+    content = f.read()
+    # Show first entry
+    first_entry_end = content.find('\n}\n') + 3
+    print(content[:first_entry_end])
+```
+
+PDF obtenidos: 
+
+```{python}
+from pathlib import Path
+
+dir_path = Path('papers/downloaded/zotero')
+if not dir_path.exists():
+    print(0)
+else:
+    count = sum(1 for p in dir_path.rglob('*') if p.is_file() and p.suffix.lower() == '.pdf')
+    print(count)
+```
+
+
+### Minado de afiliaciones
+
+Ahora vamos a extraer a partir del texto de los PDFs (utilizando 'PyMuPDF') en conjunto con 'spaCy'.
+
+- Utiliza **regex** y [NLP](https://en.wikipedia.org/wiki/Natural_language_processing) para detectar las afiliaciones
+- Consideramos inglés y español ('en_core_web_sm' y 'es_core_web_sm')
+- A partir de las afiliaciones, expandiremos la búsqueda de Pubmed
+
+Resultados:
+
+```{python}
+# Load the pre-filtered affiliation results
+import json
+
+def load_filtered_affiliations(min_score=15.0):
     """
-    url = f"https://www.ifc.unam.mx/publicaciones.php?year={year}"
+    Load pre-filtered affiliation clusters for PubMed searches.
     
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            html = await response.text()
-            soup = BeautifulSoup(html, 'html.parser')
-            
-            print(f"🔍 Scraping IFC publications for {year}...")
-            
-            # This selector is good, it finds all the publication containers.
-            publication_links = soup.find_all('a', class_=['opensans400', 'd-flexy'])
-            print(f"📚 Found {len(publication_links)} potential publication links. Attempting to parse all...")
-            
-            publications = []
-            
-            for link in publication_links:
-                pub_text = link.get_text().strip().replace('\n', ' ')
-                
-                # Default values
-                authors, pub_year, title, journal, doi = None, year, None, None, None
-
-                try:
-                    # More robust extraction using combined regex and string splitting
-                    
-                    # Extract Authors and Year: Captures everything before "(YYYY)"
-                    author_year_match = re.search(r'^(.*?)\s*\((\d{4})\)', pub_text)
-                    if author_year_match:
-                        authors = author_year_match.group(1).strip().rstrip('.')
-                        pub_year = int(author_year_match.group(2))
-
-                    # Extract DOI: Standard DOI pattern
-                    doi_match = re.search(r'(10\.\d+/[^\s<>"]+)', pub_text)
-                    if doi_match:
-                        doi = doi_match.group(1).strip()
-
-                    # Extract Title and Journal from the text between year and DOI
-                    if author_year_match:
-                        # Get the text after the year "(YYYY). "
-                        remaining_text = pub_text[author_year_match.end(0):].strip()
-                        if remaining_text.startswith('.'):
-                            remaining_text = remaining_text[1:].strip()
-                        
-                        # Remove the DOI part if it exists, to not confuse the parser
-                        if doi:
-                            remaining_text = remaining_text.replace(doi, '')
-
-                        # Split the remainder by periods. Usually: "Title. Journal. Other info."
-                        parts = [part.strip() for part in remaining_text.split('.') if part]
-                        if len(parts) > 0:
-                            title = parts[0]
-                        if len(parts) > 1:
-                            journal = parts[1]
-
-                    # Get the IFC-specific URL
-                    ifc_url = link.get('href')
-                    if ifc_url and not ifc_url.startswith('http'):
-                        ifc_url = f"https://www.ifc.unam.mx/{ifc_url}"
-                    
-                    publications.append({
-                        'title': title,
-                        'authors': authors,
-                        'journal': journal,
-                        'year': pub_year,
-                        'doi': doi,
-                        'ifc_url': ifc_url,
-                    })
-                
-                except Exception as e:
-                    # This will catch any unexpected errors for a specific entry
-                    print(f"Could not parse entry: {pub_text[:60]}... | Error: {e}")
-                    continue
-
-            print(f"🎉 Successfully extracted information for {len(publications)} publications!")
-            return publications
-
-# --- Main execution block ---
-publications_data = await scrape_ifc_publications_revised(2024)
-
-# 2. TIDY TABLE OUTPUT
-# Convert the list of dictionaries into a Pandas DataFrame
-if publications_data:
-    df_publications = pd.DataFrame(publications_data)
+    Args:
+        min_score: Minimum relevance score to include (default: 15.0 for high quality)
+        
+    Returns:
+        List of affiliation terms optimized for PubMed searches
+    """
     
-    # Set display options for better viewing within notebooks/Quarto
-    pd.set_option('display.max_rows', 10)
-    pd.set_option('display.max_colwidth', 60)
+    filtered_file = './data/processed/filtered_affiliations.json'
+    
+    print(f"📁 Cargando afiliaciones: {filtered_file}")
+    
+    with open(filtered_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    clusters = data['relevant_affiliation_clusters']
+    
+    # Filter by score and extract search terms
+    affiliation_terms = []
+    
+    for cluster in clusters:
+        if cluster['relevance_score'] >= min_score:
+            
+            # Add representative term
+            representative = clean_affiliation_for_search(cluster['representative'])
+            if representative:
+                affiliation_terms.append(f'"{representative}"[Affiliation]')
+            
+            # Add top variations (limit to avoid too many terms)
+            for variation in cluster['variations'][:3]:  # Top 3 variations per cluster
+                cleaned = clean_affiliation_for_search(variation)
+                if cleaned and len(cleaned) > 10:  # Only substantial terms
+                    search_term = f'"{cleaned}"[Affiliation]'
+                    if search_term not in affiliation_terms:  # Avoid duplicates
+                        affiliation_terms.append(search_term)
+    
+    print(f"✅ Cargando {len(affiliation_terms)} términos de búsqueda de {len([c for c in clusters if c['relevance_score'] >= min_score])} clusters")
+    
+    return affiliation_terms
 
-    # Displaying the DataFrame as the last line in the cell
-    # Quarto will automatically render this as a paginated table.
-    df_publications
+def clean_affiliation_for_search(term):
+    """Clean an affiliation term for PubMed search."""
+    import re
+    
+    if not term:
+        return ""
+    
+    # Remove common noise patterns
+    cleaned = re.sub(r'[•\d]+\s*', '', term)  # Remove bullets and leading numbers
+    cleaned = re.sub(r'[^\w\s\-,.]', ' ', cleaned)  # Remove special chars except basic punctuation
+    cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize whitespace
+    cleaned = cleaned.strip()
+    
+    # Remove very generic prefixes
+    prefixes_to_remove = ['the ', 'a ', 'an ', 'at the ', 'from the ']
+    for prefix in prefixes_to_remove:
+        if cleaned.lower().startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+    
+    # Skip very short or generic terms
+    if len(cleaned) < 8:
+        return ""
+    
+    generic_terms = ['university', 'institute', 'department', 'school', 'college']
+    if cleaned.lower() in generic_terms:
+        return ""
+    
+    return cleaned
+
+# Load the filtered affiliations
+print("🔍 Afiliaciones para búsqueda de PUBMED")
+print("=" * 60)
+
+filtered_affiliations = load_filtered_affiliations(min_score=15.0)
+
+print(f"\n📋 TOP 10 términos:")
+for i, term in enumerate(filtered_affiliations[:10], 1):
+    print(f"{i:2d}. {term}")
+
+```
+
+Después de revisar y limpiar manualmente los términos de búsqueda encontrados, hacemos la búsqueda en Pubmed y expandimos la base de datos:
+
+```{python}
+# Compare counts between two JSON files and show a table with the raw JSON contents for exploration
+
+from pathlib import Path
+import json
+import pandas as pd
+import itables
+from IPython.display import HTML, display
+
+itables.init_notebook_mode(all_interactive=True)
+itables.options.warn_on_undocumented_option = False
+
+def safe_load_json(path):
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"⚠️ Archivo no encontrado: {path}")
+        return None
+    except json.JSONDecodeError:
+        print(f"⚠️ JSON inválido: {path}")
+        return None
+
+def count_records(obj):
+    """Heurística simple para contar entradas en un JSON cargado."""
+    if obj is None:
+        return 0
+    if isinstance(obj, list):
+        return len(obj)
+    if isinstance(obj, dict):
+        # If dict contains an obvious list of records, pick the largest list
+        list_lengths = [len(v) for v in obj.values() if isinstance(v, list)]
+        if list_lengths:
+            return max(list_lengths)
+        # fallback: count top-level keys as 1 record (or 0)
+        return 1 if obj else 0
+    return 0
+
+# Paths to compare (if the "processed" file does not exist, we'll compare the same raw file)
+path_a = Path('./data/raw/all_ifc_publications.json')
+path_b = Path('./data/processed/pubmed_filtered_search_results.json')
+
+if not path_b.exists():
+    # Fall back to the same file if processed version is not present
+    path_b = path_a
+
+json_a = safe_load_json(path_a) or []
+json_b = safe_load_json(path_b) or []
+
+count_a = count_records(json_a)
+count_b = count_records(json_b)
+diff = count_b - count_a
+
+# Print a short comparison summary
+print(f"Archivo A: {path_a} → {count_a} entradas")
+print(f"Archivo B: {path_b} → {count_b} entradas")
+if path_a.samefile(path_b):
+    print("Nota: ambos paths apuntan al mismo archivo.")
+print(f"Diferencia (B - A): {diff}")
+
+# Mostrar una pequeña tabla resumen con pandas + itables
+summary_df = pd.DataFrame({
+    'archivo': [str(path_a), str(path_b)],
+    'entradas': [count_a, count_b]
+})
+display(HTML("<h4>Resumen de conteo</h4>"))
+itables.show(summary_df, classes='stripe hover order-column', options={'paging': False, 'searching': False})
+
+# Finalmente, mostrar el contenido del JSON A como DataFrame para exploración
+display(HTML("<h4>Exploración: contenido de ./data/processed/pubmed_filtered_search_results.json</h4>"))
+
+def extract_record_list(obj):
+    """Return a list of records from common JSON shapes."""
+    if obj is None:
+        return []
+    if isinstance(obj, list):
+        return obj
+    if isinstance(obj, dict):
+        # Pick the largest list value if any (e.g. 'articles', 'items', 'results')
+        list_values = [v for v in obj.values() if isinstance(v, list)]
+        if list_values:
+            return max(list_values, key=len)
+        # Otherwise treat the dict itself as a single record
+        return [obj]
+    # Fallback: wrap scalar into list
+    return [obj]
+
+# Replace the previous normalization attempt with:
+records = extract_record_list(json_b)
+
+if not records:
+    print("No records found in JSON to normalize.")
+else:
+    try:
+        df_raw = pd.json_normalize(records)
+    except Exception:
+        # Last-resort: wrap the whole object
+        df_raw = pd.DataFrame(records)
+
+    # Keep display compact: randomize order and limit columns width (CSS)
+    df_raw = df_raw.sample(frac=1).reset_index(drop=True)
+    css = """
+    <style>
+    table.dataTable td, table.dataTable th { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    div.dataTables_wrapper { overflow-x: auto; }
+    </style>
+    """
+    display(HTML(css))
+    itables.show(df_raw, classes='stripe hover order-column',
+                 options={'autoWidth': False,
+                          'columnDefs': [{'targets': '_all', 'width': '180px'}],
+                          'scrollX': True, 'pageLength': 25})
+
+```
 
 
+## Embeddings
+
+Probado con:
+
+🔥 PyTorch: 2.8.0+cu128
+🖥️ CUDA
+🎮 GPU: NVIDIA GeForce RTX 3050 Laptop GPU
+💾 GPU: 4.0 GB
+
+### EmbeddingGemma
+
+Parámetros:
+
+🔧 cuda: True
+📥 Modelo EmbeddingGemma: 'google/embeddinggemma-300M'
+📊 Parámetros del modelo: '307,581,696'
+
+```{python}
+# Simplified: load embeddings (or use existing variables) and show only t-SNE + UMAP visualizations.
+import os, json
+import numpy as np
+import pandas as pd
+from pathlib import Path
+from sklearn.manifold import TSNE
+from umap import UMAP
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+# Paths
+output_dir = Path('./notebooks/data/processed')
+emb_file = output_dir / 'embeddinggemma_publication_embeddings.npy'
+meta_file = output_dir / 'embeddinggemma_publication_embeddings_meta.json'
+
+# Load embeddings matrix (try existing names first, then file)
+if 'embeddings_matrix' in globals():
+    embeddings_matrix = np.asarray(embeddings_matrix)
+elif 'gemma_embeddings' in globals():
+    embeddings_matrix = np.asarray(gemma_embeddings)
+elif emb_file.exists():
+    embeddings_matrix = np.load(str(emb_file), allow_pickle=True)
+else:
+    raise FileNotFoundError("No embeddings found in variables or data/processed/*.npy")
+
+n_samples = embeddings_matrix.shape[0]
+
+# Load or build a minimal df_embed with 'title' and 'source_type'
+if 'df_embed' in globals():
+    df = df_embed.copy()
+else:
+    # Try to get some metadata (may not include titles); otherwise create placeholders.
+    titles = [f'Item {i+1}' for i in range(n_samples)]
+    source_type = ['Unknown'] * n_samples
+    if meta_file.exists():
+        try:
+            meta = json.loads(meta_file.read_text(encoding='utf-8'))
+            # If meta contains dataset_info with counts, don't rely on it for per-item labels.
+            # Keep placeholders but prefer any available 'source_labels' field.
+            if isinstance(meta.get('source_labels'), list) and len(meta['source_labels']) == n_samples:
+                source_type = meta['source_labels']
+            if isinstance(meta.get('titles'), list) and len(meta['titles']) == n_samples:
+                titles = meta['titles']
+        except Exception:
+            pass
+    df = pd.DataFrame({'title': titles, 'source_type': source_type})
+    df.index = range(n_samples)
+
+# Prepare hover text that includes source
+df['source_type'] = df['source_type'].fillna('Unknown').astype(str)
+df['hover_text'] = df['title'].astype(str) + '<br><b>Source:</b> ' + df['source_type']
+
+# Compute t-SNE (adjust perplexity for small sets)
+perplexity = 30
+if n_samples <= 50:
+    perplexity = max(5, (n_samples - 1) // 3)
+from inspect import signature
+# Use max_iter when available (newer scikit-learn), otherwise fall back to n_iter for older versions
+if 'max_iter' in signature(TSNE).parameters:
+    tsne = TSNE(n_components=2, random_state=42, perplexity=max(2, int(perplexity)), init='pca', max_iter=1000)
+else:
+    tsne = TSNE(n_components=2, random_state=42, perplexity=max(2, int(perplexity)), init='pca', n_iter=1000)
+tsne_results = tsne.fit_transform(embeddings_matrix)
+
+df['tsne_x'] = tsne_results[:, 0]
+df['tsne_y'] = tsne_results[:, 1]
+
+# Compute UMAP
+umap_n = min(15, max(2, n_samples - 1))
+umap_reducer = UMAP(n_neighbors=umap_n, min_dist=0.1, random_state=42)
+umap_results = umap_reducer.fit_transform(embeddings_matrix)
+df['umap_x'] = umap_results[:, 0]
+df['umap_y'] = umap_results[:, 1]
+
+# Build interactive Plotly figure with two subplots
+fig = make_subplots(rows=1, cols=2,
+                    subplot_titles=("t-SNE (EmbeddingGemma)", "UMAP (EmbeddingGemma)"),
+                    specs=[[{"type": "scatter"}, {"type": "scatter"}]])
+
+# Plot by source_type (one trace per category) with hover showing title + source
+categories = df['source_type'].astype(str).fillna('Unknown').unique()
+for cat in categories:
+    mask = df['source_type'].astype(str) == cat
+    # t-SNE trace (show legend)
+    fig.add_trace(
+        go.Scatter(
+            x=df.loc[mask, 'tsne_x'],
+            y=df.loc[mask, 'tsne_y'],
+            mode='markers',
+            name=str(cat),
+            text=df.loc[mask, 'hover_text'],
+            hovertemplate='%{text}<extra></extra>',
+            marker=dict(size=6, opacity=0.8)
+        ),
+        row=1, col=1
+    )
+    # UMAP trace (reuse color/legend but hide duplicate legend entry)
+    fig.add_trace(
+        go.Scatter(
+            x=df.loc[mask, 'umap_x'],
+            y=df.loc[mask, 'umap_y'],
+            mode='markers',
+            name=str(cat),
+            text=df.loc[mask, 'hover_text'],
+            hovertemplate='%{text}<extra></extra>',
+            marker=dict(size=6, opacity=0.8),
+            showlegend=False
+        ),
+        row=1, col=2
+    )
+
+# Subcaption / note explaining the plots and methods
+note_text = (
+    "Note: Each point is a publication embedded with EmbeddingGemma (google/embeddinggemma-300M). "
+    f"t-SNE computed with perplexity={int(perplexity)}, init='pca', iterations≈1000. "
+    f"UMAP computed with n_neighbors={umap_n}, min_dist=0.1. "
+    "Hover a point to see the title and the source/collection it came from."
+)
+
+fig.update_layout(
+    title_text="EmbeddingGemma: t-SNE and UMAP visualizations",
+    height=650,
+    width=1100,
+    margin=dict(b=140)  # make room for the note
+)
+
+# Add the explanatory note below the plots
+fig.add_annotation(
+    x=0.5, y=-0.13, xref='paper', yref='paper',
+    text=note_text,
+    showarrow=False,
+    font=dict(size=11),
+    align='center'
+)
+
+fig.show()
 ```
