@@ -1,103 +1,64 @@
-# UBMI-IFC-Podcast
+# Automated Scientific Podcast Generator
 
-Automated Scientific Podcast Generator for Instituto de Fisiología Celular (IFC-UNAM)
+This project is an automated pipeline that transforms scientific publications from the Instituto de Fisiología Celular (IFC-UNAM) into engaging podcasts. It scrapes publication data, analyzes research trends, finds related articles, and uses AI to generate and voice podcast scripts.
 
-## Overview
+## Features
 
-This project creates an automated pipeline that:
-1. **Scrapes** scientific publications from IFC-UNAM website (2021-2025)
-2. **Analyzes** research themes using embeddings and clustering
-3. **Searches** PubMed for recent relevant articles
-4. **Generates** podcast scripts using LLMs
-5. **Creates** audio podcasts using text-to-speech
+- **Web Scraping**: Gathers publication data from the IFC-UNAM website.
+- **AI-Powered Analysis**: Uses embeddings and language models to identify research themes and generate content.
+- **Podcast Production**: Automatically generates podcast scripts and converts them to audio.
+- **Interactive Showcase**: An interactive `index.html` file, generated from `index.qmd`, demonstrates the project's capabilities.
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.8+
+- An environment manager (like `venv` or `conda`)
+
+### Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/santi-rios/UBMI-IFC-Podcast.git
+    cd UBMI-IFC-Podcast
+    ```
+
+2.  **Set up a virtual environment:**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    ```
+
+3.  **Install the required packages:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Configure API Keys:**
+    - Copy the configuration template:
+      ```bash
+      cp config/config.template.yaml config/config.yaml
+      ```
+    - Add your API keys to `config/config.yaml`. **This file is ignored by Git to protect your keys.**
+
+### Running the Project
+
+The core of this project is showcased in the `final_pipeline.ipynb` notebook. This notebook provides a step-by-step walkthrough of the entire process, from data scraping to podcast generation.
+
+For an interactive overview of the project's functionalities, open the `index.html` file in your web browser.
 
 ## Project Structure
 
-```
-UBMI-IFC-Podcast/
-├── src/                    # Source code
-│   ├── scrapers/          # Web scraping modules
-│   ├── embeddings/        # Embedding analysis
-│   ├── pubmed/           # PubMed integration
-│   ├── llm/              # LLM script generation
-│   ├── audio/            # Audio generation
-│   ├── utils/            # Utility functions
-│   └── pipeline.py       # Main orchestrator
-├── data/                  # Data storage
-│   ├── raw/              # Raw scraped data
-│   ├── processed/        # Processed data
-│   └── embeddings/       # Embedding vectors
-├── config/               # Configuration files
-├── notebooks/            # Jupyter testing notebooks
-├── outputs/              # Generated content
-│   ├── scripts/          # Podcast scripts
-│   └── podcasts/         # Audio files
-├── tests/                # Unit tests
-└── main.py              # Entry point
-
-```
-
-## Quick Start
-
-### 🔒 **IMPORTANT**: Security Setup First
-
-Before running the project, you need to set up your API keys safely:
-
-```bash
-# 1. Copy configuration templates
-cp config/config.template.yaml config/config.yaml
-cp .env.template .env
-
-# 2. Edit config/config.yaml and .env with your actual API keys
-# See SECURITY.md for detailed instructions
-```
-
-**⚠️ NEVER commit files with real API keys to a public repository!**
-
-### 1. Installation
-
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd UBMI-IFC-Podcast
-
-# RECOMMENDED: Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# OR: venv\Scripts\activate  # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-**📚 For detailed environment setup options, see [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md)**
-
-### 2. Configuration
-
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your API keys
-nano .env
-```
-
-Required API keys:
-- OpenAI or Anthropic (for script generation)
-- ElevenLabs or Azure Speech (for audio generation)
-- PubMed email (required by NCBI)
-
-### 3. Test Components
-
-```bash
-# Test individual components
-python main.py --test-components
-
-# Use Jupyter notebooks for detailed testing
-jupyter lab notebooks/
-```
-
-### 4. Run Pipeline
+- `final_pipeline.ipynb`: The main notebook demonstrating the entire workflow.
+- `index.qmd` & `index.html`: An interactive presentation of the project.
+- `src/`: Contains the Python source code for the pipeline.
+- `config/`: Holds configuration files. `config.template.yaml` is a template for your own `config.yaml`.
+- `requirements.txt`: A list of all necessary Python packages.
+- `notebooks/`: Contains additional notebooks for specific tasks and experiments.
+- `.gitignore`: Specifies which files and directories to exclude from version control.
+- `LICENSE`: The project's license.
+- `README.md`: This file.
 
 ```bash
 # Run complete pipeline

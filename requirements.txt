@@ -44,3 +44,4 @@ jupyter>=1.0.0
 
 # Rate limiting
 ratelimit>=2.2.0
+quarto>=1.4.554

@@ -1,12 +1,29 @@
-# Byte-compiled / optimized / DLL files
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Secrets
+*.env.local
+*.env.*.local
+config.yaml
+secrets.yaml
+*.pem
+*.key
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
 __pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
+*.pyc
+*.pyo
+*.pyd
 .Python
 build/
 develop-eggs/
@@ -25,79 +42,61 @@ wheels/
 *.egg
 MANIFEST
 
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-
-# Virtual environments
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Environment variables and API Keys
-.env
-.env.local
-.env.*.local
-config/config.yaml
-config/config.local.yaml
-**/api_keys.yaml
-**/secrets.yaml
-**/*secret*
-**/*key*
-
 # Jupyter Notebook
 .ipynb_checkpoints
 
 # Data files
-data/raw/*.json
-data/raw/*.csv
-data/processed/*.db
-data/embeddings/*.pkl
-data/embeddings/*.npy
+data/
+chromadb/
+*.sqlite3
+*.csv
+*.json
+*.bib
+*.npy
 
-# Output files
-outputs/podcasts/*.mp3
-outputs/podcasts/*.wav
-outputs/scripts/*.txt
-outputs/scripts/*.md
-
-# Logs
+# Outputs
+outputs/
+results/
+papers/
 logs/
-*.log
 
-# Temporary files
+# Quarto
+_quarto/
+*.html
+!index.html
+
+# Other
+.DS_Store
+Thumbs.db
 temp/
 tmp/
-
-# Chrome driver
-chromedriver
-geckodriver
-
-# Model cache
-.cache/
-transformers_cache/
+*~
+*.bak
+*.tmp
+*.log
+cookbook/
+setup-requirements.txt
+REFACTORING_SUMMARY.md
+todo.md
+PRESENTACION_PI_SISTEMA_PODCASTS.ipynb
+RESUMEN_PROYECTO_PI.html
+RESUMEN_PROYECTO_PI.md
+wiki/
+ENVIRONMENT_SETUP.md
+SECURITY.md
+# Keep LICENSE file
+# !LICENSE
+# setup.py is a helper script, not for distribution
+# setup.py 
+# final_pipeline.ipynb is the main notebook
+# !final_pipeline.ipynb
+# index.qmd is the source for the main page
+# !index.qmd
+# requirements.txt is necessary
+# !requirements.txt
+# README.md is necessary
+# !README.md
+# The main source code
+# !src/
+# Config template
+# !config/config.template.yaml
