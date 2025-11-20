@@ -228,11 +228,10 @@ Generated content is saved to:
 
 ## License
 
-[Your License Here]
+[] # revisar esto
 
 ## Acknowledgments
 
 - Instituto de Fisiología Celular, UNAM
 - PubMed/NCBI for article access
 - OpenAI/Anthropic for LLM services
-- ElevenLabs for text-to-speech
