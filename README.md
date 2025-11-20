@@ -42,9 +42,24 @@ This project is an automated pipeline that transforms scientific publications fr
       ```
     - Add your API keys to `config/config.yaml`. **This file is ignored by Git to protect your keys.**
 
-### Running the Project
+## Running the Project
 
 The core of this project is showcased in the `final_pipeline.ipynb` notebook. This notebook provides a step-by-step walkthrough of the entire process, from data scraping to podcast generation.
+
+### Run on Google Colab
+
+You can run this project directly in your browser using Google Colab. Click the button below to open the notebook:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/santi-rios/UBMI-IFC-Podcast/blob/main/final_pipeline.ipynb)
+
+Before running the notebook, you'll need to add your API keys to Colab's secrets manager. In the Colab interface, click on the **key icon** in the left sidebar and add the following secrets:
+
+-   `GEMINI_API_KEY`
+-   `ELEVENLABS_API_KEY`
+-   `PUBMED_API_KEY`
+-   `EMAIL`
+
+### Run Locally
 
 For an interactive overview of the project's functionalities, open the `index.html` file in your web browser.
 
