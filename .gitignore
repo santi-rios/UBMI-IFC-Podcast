@@ -100,3 +100,11 @@ SECURITY.md
 # !src/
 # Config template
 # !config/config.template.yaml
+
+# Kokoro TTS model files (large, download separately)
+kokoro-v1.0.onnx
+voices-v1.0.bin
+
+# Test files
+test_*.txt
+test_*.wav
