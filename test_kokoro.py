@@ -62,7 +62,7 @@ def test_kokoro_installation():
     
     # Test 4: Generate a test audio file
     print("\n4. Testing audio generation...")
-    test_text = "Hello, this is a test of Kokoro TTS in English."
+    test_text = "Hello, this is a test of Kokoro TTS in English. This is a local model that could be used to generate podcasts based on Pumed's recent articles."
     
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
         f.write(test_text)

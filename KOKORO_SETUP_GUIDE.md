@@ -86,8 +86,12 @@ python test_kokoro.py
 
 Or test manually:
 ```bash
-echo "Hello, this is a test." > test.txt
-kokoro-tts test.txt output.wav --lang en-us --voice af_sarah
+echo "Welcome to the Institute’s Daily Brief. I’m your host, and today we’re evaluating our new synthesis engine, Kokoro, using recent metadata from PubMed.
+
+This is a rigorous stress test for natural language processing. For instance, how does the model handle complex nomenclature like 'Phosphatidylinositol 3-kinase' or the nuances of in vivo versus in vitro studies?
+
+We are specifically looking for a balanced prosody—one that avoids a robotic drone while maintaining the professional gravitas required for high-impact research. Let’s dive into today’s breakthroughs in molecular biology and clinical therapeutics. We hope you enjoy the insights!" > test.txt
+kokoro-tts test.txt output_long.wav --lang en-us --voice af_sarah
 rm test.txt output.wav
 ```
 
